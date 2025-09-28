@@ -42,8 +42,8 @@ export function AssetsActivity() {
           />
         ) : (
           <ul className='divide-y divide-border'>
-            {activity.slice(0, 15).map((a) => (
-              <li key={a.id} className='p-4 flex items-center justify-between'>
+            {activity.slice(0, 15).map((a, index) => (
+              <li key={`${a.id}-${index}`} className='p-4 flex items-center justify-between'>
                 <div className='min-w-0'>
                   <div className='text-sm font-medium truncate'>{a.summary}</div>
                   <div className='text-xs text-muted-foreground'>{formatDate(a.ts)}</div>

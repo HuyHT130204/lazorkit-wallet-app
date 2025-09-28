@@ -19,8 +19,8 @@ export default function SuccessCallbackPage() {
 
   const orderId = searchParams.get('orderId');
   const amount = parseFloat(searchParams.get('amount') || '0');
-  const token = searchParams.get('token') as any;
-  const currency = searchParams.get('currency') as any;
+  const token = searchParams.get('token') as 'SOL' | 'USDC' | 'USDT' | null;
+  const currency = searchParams.get('currency') as 'USD' | 'VND' | null;
 
   useEffect(() => {
     if (orderId && amount && token && currency) {
@@ -40,7 +40,7 @@ export default function SuccessCallbackPage() {
       
       toast({
         title: t('success.walletReady'),
-        description: "Your wallet is now ready to use!",
+        description: t('success.walletReadyDesc'),
       });
     }
 

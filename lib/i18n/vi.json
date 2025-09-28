@@ -126,6 +126,8 @@
   "wallet": {
     "publicKey": "Khóa công khai",
     "totalBalance": "Tổng số dư",
+    "portfolioValue": "Giá trị danh mục",
+    "connected": "Đã kết nối",
     "hideBalance": "Ẩn số dư",
     "showBalance": "Hiện số dư",
     "send": "Gửi",
@@ -148,7 +150,16 @@
     "confirm": "Xác nhận gửi",
     "invalidAddress": "Định dạng địa chỉ không hợp lệ",
     "insufficientBalance": "Số dư không đủ",
-    "scanUnavailable": "Máy quét QR không khả dụng trong demo"
+    "scanUnavailable": "Máy quét QR không khả dụng trong demo",
+    "enterRecipient": "Vui lòng nhập địa chỉ người nhận",
+    "availableBalance": "Số dư khả dụng",
+    "scanQR": "Quét QR",
+    "sending": "Đang gửi...",
+    "transactionDetails": "Chi tiết giao dịch",
+    "totalAmount": "Tổng số tiền",
+    "transactionSent": "Giao dịch đã được gửi",
+    "sentSuccessfully": "gửi thành công",
+    "pasteFailed": "Không thể dán từ clipboard"
   },
   "deposit": {
     "title": "Nạp Token",
@@ -157,7 +168,24 @@
     "qrCode": "Mã QR",
     "copyAddress": "Sao chép địa chỉ",
     "scanToDeposit": "Quét mã QR này để nạp tiền",
-    "depositNote": "Gửi token đến địa chỉ này để nạp vào ví của bạn"
+    "depositNote": "Gửi token đến địa chỉ này để nạp vào ví của bạn",
+    "noWallet": "Không có ví khả dụng",
+    "noWalletDesc": "Vui lòng tạo ví trước để nhận tiền nạp",
+    "scanQRCode": "Quét mã QR",
+    "scanQRDesc": "Sử dụng ví di động để quét mã QR này",
+    "downloadQR": "Tải mã QR",
+    "share": "Chia sẻ",
+    "depositAddress": "Địa chỉ nạp tiền",
+    "instructions": "Hướng dẫn",
+    "instruction1": "Sao chép địa chỉ hoặc quét mã QR bằng ví di động",
+    "instruction2": "Gửi token đến địa chỉ này từ bất kỳ ví Solana nào",
+    "instruction3": "Token sẽ xuất hiện trong ví sau khi xác nhận",
+    "qrDownloaded": "Mã QR đã được tải",
+    "qrDownloadedDesc": "Mã QR đã được lưu vào thiết bị",
+    "shareTitle": "Địa chỉ nạp tiền",
+    "shareText": "Gửi token đến địa chỉ Solana này",
+    "addressCopied": "Địa chỉ đã được sao chép",
+    "addressCopiedDesc": "Địa chỉ nạp tiền đã được sao chép vào clipboard"
   },
   "apps": {
     "title": "Ứng dụng Solana",
@@ -211,7 +239,10 @@
     "copyLink": "Sao chép liên kết",
     "confirmRemove": "Bạn có chắc chắn muốn xóa thiết bị này?",
     "deviceRemoved": "Đã xóa thiết bị thành công",
-    "linkCopied": "Đã sao chép liên kết ghép đôi vào clipboard"
+    "linkCopied": "Đã sao chép liên kết ghép đôi vào clipboard",
+    "addDeviceInstructions": "Quét mã QR hoặc sao chép liên kết ghép đôi để thêm thiết bị mới vào ví của bạn.",
+    "addDemoDevice": "Thêm thiết bị demo",
+    "linkCopiedDesc": "Đã sao chép liên kết ghép đôi vào clipboard"
   },
   "settings": {
     "title": "Cài đặt",
@@ -242,6 +273,24 @@
     "currencies": {
       "usd": "USD",
       "vnd": "VND"
+    },
+    "walletManager": {
+      "title": "Quản lý ví",
+      "currentAddress": "Địa chỉ hiện tại",
+      "generateNew": "Tạo ví mới",
+      "refreshBalances": "Làm mới số dư",
+      "setCustomAddress": "Đặt địa chỉ tùy chỉnh",
+      "enterSolanaAddress": "Nhập địa chỉ Solana...",
+      "setAddress": "Đặt địa chỉ",
+      "connectionInfo": "Thông tin kết nối",
+      "newWalletGenerated": "Đã tạo ví mới",
+      "newWalletGeneratedDesc": "Một địa chỉ ví mới đã được tạo",
+      "balancesRefreshed": "Đã làm mới số dư",
+      "balancesRefreshedDesc": "Số dư token đã được cập nhật",
+      "refreshFailed": "Làm mới thất bại",
+      "refreshFailedDesc": "Sử dụng dữ liệu demo - Kết nối RPC không khả dụng",
+      "addressSet": "Đã đặt địa chỉ",
+      "addressSetDesc": "Địa chỉ tùy chỉnh đã được đặt"
     }
   },
   "success": {
@@ -251,7 +300,8 @@
     "token": "Token",
     "publicKey": "Khóa công khai",
     "returnToApp": "Quay lại ứng dụng",
-    "walletReady": "Ví đã sẵn sàng!"
+    "walletReady": "Ví đã sẵn sàng!",
+    "walletReadyDesc": "Ví của bạn giờ đây đã sẵn sàng sử dụng!"
   },
   "errors": {
     "generic": "Đã xảy ra lỗi. Vui lòng thử lại.",

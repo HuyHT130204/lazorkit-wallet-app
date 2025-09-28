@@ -5,6 +5,7 @@ import { Settings2, ChevronDown } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card } from './ui/card';
+import { TokenLogo } from './ui/token-logo';
 import { OnRampPreviewModal } from './onramp-preview-modal';
 import { useRouter } from 'next/navigation';
 import {
@@ -100,13 +101,11 @@ export const OnRampForm = ({ onPreview, tokenData }: OnRampFormProps) => {
               nextElement?.classList.remove('hidden');
             }}
           />
-          <span className='hidden text-lg'>
-            {fallbackTokenIcons[symbol] || '?'}
-          </span>
+          <TokenLogo symbol={symbol} size={20} />
         </>
       );
     }
-    return <span className='text-lg'>{fallbackTokenIcons[symbol] || '?'}</span>;
+    return <TokenLogo symbol={symbol} size={20} />;
   };
 
   const validateForm = () => {
@@ -171,9 +170,9 @@ export const OnRampForm = ({ onPreview, tokenData }: OnRampFormProps) => {
   };
 
   const paymentMethods = [
-    { value: 'card' as PaymentMethod, label: 'Card', icon: '💳' },
-    { value: 'applepay' as PaymentMethod, label: 'Apple', icon: '🍎' },
-    { value: 'vnpay' as PaymentMethod, label: 'VNPay', icon: '₫' },
+    { value: 'card' as PaymentMethod, label: 'Card', icon: '/placeholder-logo.png' },
+    { value: 'applepay' as PaymentMethod, label: 'Apple Pay', icon: '/apple_logo.png' },
+    { value: 'vnpay' as PaymentMethod, label: 'VNPAY QR', icon: '/vietnam_logo.png' },
   ];
 
   return (
@@ -321,7 +320,9 @@ export const OnRampForm = ({ onPreview, tokenData }: OnRampFormProps) => {
                     : 'bg-muted/5 border-border/50 hover:bg-muted/10'
                 }`}
               >
-                <span className='text-base'>{method.icon}</span>
+                <span className='text-base'>
+                  <img src={method.icon} alt={method.label} className='w-5 h-5 rounded-sm' />
+                </span>
                 <span className='text-xs font-medium'>{
                   method.value === 'card' ? t('onRamp.card') : method.value === 'applepay' ? t('onRamp.applePay') : t('onRamp.vnpay')
                 }</span>

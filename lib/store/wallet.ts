@@ -11,6 +11,16 @@ import {
   AppCard,
   Activity,
 } from '@/lib/mock-data/types';
+import { 
+  generateFakeWalletAddress, 
+  getTokenBalance, 
+  getAllTokenBalances,
+  getSwapQuote,
+  getSwapTransaction,
+  defaultConnection,
+  TOKEN_ADDRESSES
+} from '@/lib/services/jupiter';
+import { Connection } from '@solana/web3.js';
 
 // Re-export types for backward compatibility
 export type {
@@ -61,19 +71,24 @@ export interface WalletState {
     orderId: string
   ) => void;
   swapFake: (fromToken: TokenSym, toToken: TokenSym, amount: number) => void;
+  swapReal: (fromToken: TokenSym, toToken: TokenSym, amount: number) => Promise<boolean>;
   sendFake: (token: TokenSym, amount: number, recipient: string) => void;
   depositFake: (token: TokenSym, amount: number) => void;
   addDevice: (device: Device) => void;
   removeDevice: (deviceId: string) => void;
   addActivity: (activity: Activity) => void;
   resetDemoData: () => void;
+  // New blockchain functions
+  generateNewWallet: () => void;
+  refreshBalances: () => Promise<void>;
+  getRealTokenBalance: (tokenMint: string) => Promise<number>;
 }
 
 // Only use mock data if demo mode is enabled
 const getInitialData = () => {
   if (ENV_CONFIG.ENABLE_DEMO) {
     return {
-      pubkey: '9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM', // Fake Solana pubkey for demo
+      pubkey: generateFakeWalletAddress(), // Generate new fake address each time
       tokens: sampleTokens,
       devices: sampleDevices,
       apps: sampleApps,
@@ -315,18 +330,148 @@ export const useWalletStore = create<WalletState>()(
             activity: data.activity,
           });
         },
+
+        // New blockchain functions
+        generateNewWallet: () => {
+          const newAddress = generateFakeWalletAddress();
+          set({ pubkey: newAddress });
+        },
+
+        refreshBalances: async () => {
+          const state = get();
+          if (!state.pubkey) {
+            console.warn('No pubkey available for refreshBalances');
+            return;
+          }
+
+          try {
+            // Validate connection
+            if (!defaultConnection) {
+              console.error('No connection available');
+              return;
+            }
+
+            const balances = await getAllTokenBalances(state.pubkey, defaultConnection);
+            
+            if (!balances || typeof balances !== 'object') {
+              console.warn('Invalid balances response:', balances);
+              return;
+            }
+
+            const newTokens = state.tokens.map(token => {
+              try {
+                const mint = TOKEN_ADDRESSES[token.symbol as keyof typeof TOKEN_ADDRESSES];
+                if (mint && balances.has(mint)) {
+                  const balance = balances.get(mint);
+                  return { ...token, amount: typeof balance === 'number' ? balance : 0 };
+                }
+                return token;
+              } catch (error) {
+                console.warn('Error processing token:', token.symbol, error);
+                return token;
+              }
+            });
+            
+            set({ tokens: newTokens });
+          } catch (error) {
+            console.error('Error refreshing balances:', error);
+            // Don't throw error, just log it
+          }
+        },
+
+        getRealTokenBalance: async (tokenMint: string) => {
+          const state = get();
+          if (!state.pubkey) {
+            console.warn('No pubkey available for getRealTokenBalance');
+            return 0;
+          }
+
+          if (!tokenMint || typeof tokenMint !== 'string') {
+            console.warn('Invalid tokenMint:', tokenMint);
+            return 0;
+          }
+
+          try {
+            if (!defaultConnection) {
+              console.error('No connection available');
+              return 0;
+            }
+
+            const balance = await getTokenBalance(state.pubkey, tokenMint, defaultConnection);
+            return typeof balance === 'number' ? balance : 0;
+          } catch (error) {
+            console.error('Error getting token balance:', error);
+            return 0;
+          }
+        },
+
+        swapReal: async (fromToken: TokenSym, toToken: TokenSym, amount: number) => {
+          const state = get();
+          if (!state.pubkey) {
+            console.warn('No pubkey available for swapReal');
+            return false;
+          }
+
+          if (!fromToken || !toToken || !amount || amount <= 0) {
+            console.warn('Invalid swap parameters:', { fromToken, toToken, amount });
+            return false;
+          }
+
+          try {
+            const fromMint = (TOKEN_ADDRESSES as Record<string, string>)[fromToken];
+            const toMint = (TOKEN_ADDRESSES as Record<string, string>)[toToken];
+            
+            if (!fromMint || !toMint) {
+              console.error('Invalid token addresses:', { fromToken, toToken, fromMint, toMint });
+              return false;
+            }
+
+            // Validate amount
+            if (typeof amount !== 'number' || !isFinite(amount) || amount <= 0) {
+              console.error('Invalid amount:', amount);
+              return false;
+            }
+
+            // Get swap quote with error handling
+            const quote = await getSwapQuote(fromMint, toMint, amount * 1e9);
+            if (!quote || typeof quote !== 'object') {
+              console.error('Failed to get swap quote or invalid quote:', quote);
+              return false;
+            }
+
+            // Get swap transaction with error handling
+            const swapTransaction = await getSwapTransaction(quote, state.pubkey);
+            if (!swapTransaction || typeof swapTransaction !== 'object') {
+              console.error('Failed to get swap transaction or invalid transaction:', swapTransaction);
+              return false;
+            }
+
+            // In a real implementation, you would sign and send the transaction here
+            // For demo purposes, we'll simulate the swap
+            console.log('Swap transaction prepared:', swapTransaction.swapTransaction);
+            
+            // Simulate successful swap
+            state.swapFake(fromToken, toToken, amount);
+            
+            return true;
+          } catch (error) {
+            console.error('Error performing real swap:', error);
+            return false;
+          }
+        },
       };
     },
     {
       name: 'lazorkit-wallet-storage',
       version: 1,
-      migrate: (persistedState: any, version: number) => {
+      migrate: (persistedState: unknown, version: number) => {
         // If migrating from version 0 (no version) or if demo mode is disabled,
         // reset the wallet state to match the environment configuration
         if (version === 0 || !ENV_CONFIG.ENABLE_DEMO) {
           const initialData = getInitialData();
+          const base = (persistedState && typeof persistedState === 'object') ? (persistedState as Record<string, unknown>) : {};
           return {
-            ...persistedState,
+            ...base,
             hasPasskey: ENV_CONFIG.ENABLE_DEMO,
             hasWallet: ENV_CONFIG.ENABLE_DEMO,
             pubkey: initialData.pubkey,

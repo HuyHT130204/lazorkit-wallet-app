@@ -1,0 +1,30 @@
+{
+  "extends": [
+    "stylelint-config-standard"
+  ],
+  "overrides": [
+    {
+      "files": ["**/*.css"],
+      "customSyntax": "postcss-css-in-js"
+    }
+  ],
+  "rules": {
+    "at-rule-no-unknown": [
+      true,
+      {
+        "ignoreAtRules": [
+          "tailwind",
+          "apply",
+          "layer",
+          "theme",
+          "custom-variant"
+        ]
+      }
+    ],
+    "block-no-empty": null
+  }
+}
+
+
+
+

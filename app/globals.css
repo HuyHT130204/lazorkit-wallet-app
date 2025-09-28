@@ -1,3 +1,4 @@
+/* stylelint-disable */
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -46,16 +47,10 @@
   --sidebar-border: #262834;
   --sidebar-ring: #9B7AFF;
 
-  /* Gradients - Purple Theme */
-  --gradient-primary: linear-gradient(135deg, #7857ff, #6B4CE6);
-  --gradient-secondary: linear-gradient(135deg, #9B7AFF, #7857ff);
-  --gradient-accent: linear-gradient(135deg, #B89AFF, #9B7AFF);
-  --gradient-card: linear-gradient(135deg, rgba(20,21,27,0.9), rgba(26,28,35,0.8));
+  /* No gradients - Clean theme */
 }
 
-.dark {
-  /* Dark mode uses same tokens (dark-first app) */
-}
+
 
 @theme inline {
   --font-sans: var(--font-geist-sans);
@@ -108,35 +103,19 @@
     backdrop-filter: blur(20px);
   }
 
-  /* Enhanced glassmorphism utility classes with better visual hierarchy */
+  /* Clean glassmorphism utility classes - no gradients */
   .glass {
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.05));
+    background: rgba(255, 255, 255, 0.05);
     backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   }
 
   .glass-card {
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+    background: rgba(255, 255, 255, 0.03);
     backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-  }
-
-  .gradient-primary {
-    background: var(--gradient-primary);
-  }
-
-  .gradient-secondary {
-    background: var(--gradient-secondary);
-  }
-
-  .gradient-accent {
-    background: var(--gradient-accent);
-  }
-
-  .gradient-card {
-    background: var(--gradient-card);
   }
 
   /* Added smooth animations and transitions for better UX */
@@ -334,23 +313,23 @@
     animation: shimmer 2s ease-in-out infinite;
   }
 
-  /* Enhanced glassmorphism for app cards */
+  /* Enhanced glassmorphism for app cards - no gradients */
   .glass-card-enhanced {
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+    background: rgba(255, 255, 255, 0.05);
     backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     box-shadow: 
       0 8px 32px rgba(0, 0, 0, 0.3),
-      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
   }
 
   .glass-card-enhanced:hover {
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.08));
+    background: rgba(255, 255, 255, 0.08);
     border: 1px solid rgba(120, 87, 255, 0.3);
     box-shadow: 
-      0 20px 40px rgba(120, 87, 255, 0.2),
+      0 20px 40px rgba(120, 87, 255, 0.15),
       0 8px 16px rgba(0, 0, 0, 0.4),
-      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
   }
 
   /* Purple glow effect for swap/buy card */
@@ -362,5 +341,72 @@
       0 4px 16px rgba(0, 0, 0, 0.1);
     border: 1px solid rgba(120, 87, 255, 0.15);
   }
+
+  /* Mobile-first responsive styles */
+  @media (max-width: 640px) {
+    .glass-card {
+      margin: 0.5rem;
+      border-radius: 0.75rem;
+    }
+    
+    .glass-card-enhanced {
+      margin: 0.5rem;
+      border-radius: 0.75rem;
+    }
+    
+    /* Mobile-specific spacing */
+    .mobile-padding {
+      padding: 1rem;
+    }
+    
+    .mobile-margin {
+      margin: 0.5rem;
+    }
+    
+    /* Mobile text sizes */
+    .mobile-text-sm {
+      font-size: 0.875rem;
+    }
+    
+    .mobile-text-xs {
+      font-size: 0.75rem;
+    }
+    
+    /* Mobile button sizes */
+    .mobile-btn-sm {
+      padding: 0.5rem 0.75rem;
+      font-size: 0.875rem;
+    }
+    
+    /* Mobile input sizes */
+    .mobile-input {
+      padding: 0.75rem;
+      font-size: 1rem;
+    }
+  }
+
+  /* Tablet responsive styles */
+  @media (min-width: 641px) and (max-width: 1024px) {
+    .tablet-padding {
+      padding: 1.5rem;
+    }
+    
+    .tablet-margin {
+      margin: 1rem;
+    }
+  }
+
+  /* Desktop responsive styles */
+  @media (min-width: 1025px) {
+    .desktop-padding {
+      padding: 2rem;
+    }
+    
+    .desktop-margin {
+      margin: 1.5rem;
+    }
+  }
+
+  /* Removed global Radix overrides that caused off-screen and scroll issues */
 
 }

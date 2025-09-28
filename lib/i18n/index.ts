@@ -24,7 +24,7 @@ export const getLanguage = (): Language => {
 
 export const t = (key: TranslationKey, params?: Record<string, string | number>): string => {
   const keys = key.split('.');
-  let value: any = translations[currentLanguage];
+  let value: unknown = translations[currentLanguage];
 
   for (const k of keys) {
     if (value && typeof value === 'object' && k in value) {

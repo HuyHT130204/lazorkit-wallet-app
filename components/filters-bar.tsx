@@ -2,13 +2,7 @@
 
 import { Filter, ChevronDown } from 'lucide-react';
 import { Button } from './ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from './ui/select';
+import { SimpleSelect } from './ui/simple-select';
 import { t } from '@/lib/i18n';
 
 interface FiltersBarProps {
@@ -33,18 +27,18 @@ export const FiltersBar = ({
   return (
     <div className={`flex flex-wrap gap-2 ${className}`}>
       {/* Category Filter */}
-      <Select value={category} onValueChange={onCategoryChange}>
-        <SelectTrigger className='w-32'>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value='all'>{t('apps.categories.all')}</SelectItem>
-          <SelectItem value='defi'>{t('apps.categories.defi')}</SelectItem>
-          <SelectItem value='social'>{t('apps.categories.social')}</SelectItem>
-          <SelectItem value='games'>{t('apps.categories.games')}</SelectItem>
-          <SelectItem value='tools'>{t('apps.categories.tools')}</SelectItem>
-        </SelectContent>
-      </Select>
+      <SimpleSelect
+        value={category}
+        onValueChange={onCategoryChange}
+        options={[
+          { value: 'all', label: t('apps.categories.all') },
+          { value: 'defi', label: t('apps.categories.defi') },
+          { value: 'social', label: t('apps.categories.social') },
+          { value: 'games', label: t('apps.categories.games') },
+          { value: 'tools', label: t('apps.categories.tools') },
+        ]}
+        className='w-32'
+      />
 
       {/* Verified Filter */}
       <Button
@@ -58,20 +52,16 @@ export const FiltersBar = ({
       </Button>
 
       {/* Sort Filter */}
-      <Select value={sortBy} onValueChange={onSortChange}>
-        <SelectTrigger className='w-32'>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value='popularity'>
-            {t('apps.sortOptions.popularity')}
-          </SelectItem>
-          <SelectItem value='newest'>{t('apps.sortOptions.newest')}</SelectItem>
-          <SelectItem value='alphabetical'>
-            {t('apps.sortOptions.alphabetical')}
-          </SelectItem>
-        </SelectContent>
-      </Select>
+      <SimpleSelect
+        value={sortBy}
+        onValueChange={onSortChange}
+        options={[
+          { value: 'popularity', label: t('apps.sortOptions.popularity') },
+          { value: 'newest', label: t('apps.sortOptions.newest') },
+          { value: 'alphabetical', label: t('apps.sortOptions.alphabetical') },
+        ]}
+        className='w-32'
+      />
     </div>
   );
 };

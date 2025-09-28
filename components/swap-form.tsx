@@ -1,16 +1,17 @@
 'use client';
 
-import { useState } from 'react';
-import { ArrowUpDown, Settings2, ChevronDown, Sparkles } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ArrowUpDown, Settings2, ChevronDown, Sparkles, RefreshCcw } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Card } from './ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
+import { TokenLogo } from './ui/token-logo';
 import { useWalletStore, TokenSym } from '@/lib/store/wallet';
 import { formatTokenAmount, formatCurrency } from '@/lib/utils/format';
 import { t } from '@/lib/i18n';
 import { SwapReviewModal } from './swap-review-modal';
 import { toast } from '@/hooks/use-toast';
-import { JupiterToken } from '@/lib/services/jupiter';
+import { JupiterToken, getSwapQuote, TOKEN_ADDRESSES, getSymbolDecimals } from '@/lib/services/jupiter';
 
 interface SwapFormProps {
   onPreview?: (data: SwapData) => void;
@@ -23,6 +24,15 @@ interface SwapData {
   toToken: TokenSym;
   amount: number;
   slippage: number;
+  quote?: {
+    inputMint: string;
+    inAmount: string;
+    outputMint: string;
+    outAmount: string;
+    priceImpactPct?: string;
+    routePlan?: unknown[];
+  };
+  estimatedReceive?: number;
 }
 
 // Fallback icons if API doesn't provide them
@@ -43,9 +53,8 @@ const fallbackTokenIcons: Record<string, string> = {
 export const SwapForm = ({
   onPreview,
   tokenData,
-  className,
 }: SwapFormProps) => {
-  const { tokens, fiat, rateUsdToVnd } = useWalletStore();
+  const { tokens, swapReal } = useWalletStore();
   const [fromToken, setFromToken] = useState<TokenSym>('USDC');
   const [toToken, setToToken] = useState<TokenSym>('SOL');
   const [amount, setAmount] = useState('');
@@ -55,10 +64,66 @@ export const SwapForm = ({
   const [showTokenSelect, setShowTokenSelect] = useState<'from' | 'to' | null>(
     null
   );
+  const [quote, setQuote] = useState<SwapData['quote'] | undefined>(undefined);
+  const [loadingQuote, setLoadingQuote] = useState(false);
+  const [useRealSwap, setUseRealSwap] = useState(false);
 
   const fromTokenData = tokens.find((t) => t.symbol === fromToken);
   const toTokenData = tokens.find((t) => t.symbol === toToken);
   const amountNum = parseFloat(amount) || 0;
+
+  // Fetch Jupiter quote when amount or tokens change
+  useEffect(() => {
+    const fetchQuote = async () => {
+      if (!amountNum || fromToken === toToken) {
+        setQuote(undefined);
+        return;
+      }
+
+      const fromMint = (TOKEN_ADDRESSES as Record<string, string>)[fromToken];
+      const toMint = (TOKEN_ADDRESSES as Record<string, string>)[toToken];
+      
+      if (!fromMint || !toMint) {
+        setQuote(undefined);
+        return;
+      }
+
+      // Validate amount before API call
+      if (amountNum <= 0 || !isFinite(amountNum)) {
+        setQuote(undefined);
+        return;
+      }
+
+      setLoadingQuote(true);
+      try {
+        const fromDecimals = getSymbolDecimals(
+          fromToken,
+          tokenData?.get(fromToken)
+        );
+        const jupiterQuote = await getSwapQuote(
+          fromMint,
+          toMint,
+          Math.round(amountNum * Math.pow(10, fromDecimals)),
+          slippage * 100 // Convert percentage to basis points
+        );
+        
+        if (jupiterQuote && typeof jupiterQuote === 'object') {
+          setQuote(jupiterQuote);
+        } else {
+          setQuote(undefined);
+          console.warn('No valid quote received from Jupiter API');
+        }
+      } catch (error) {
+        console.error('Error fetching quote:', error);
+        setQuote(undefined);
+      } finally {
+        setLoadingQuote(false);
+      }
+    };
+
+    const timeoutId = setTimeout(fetchQuote, 500); // Debounce
+    return () => clearTimeout(timeoutId);
+  }, [amountNum, fromToken, toToken, slippage]);
 
   // Get token icon from Jupiter data or use fallback
   const getTokenIcon = (symbol: string) => {
@@ -77,13 +142,11 @@ export const SwapForm = ({
               nextElement?.classList.remove('hidden');
             }}
           />
-          <span className='hidden text-lg'>
-            {fallbackTokenIcons[symbol] || '?'}
-          </span>
+          <TokenLogo symbol={symbol} size={20} />
         </>
       );
     }
-    return <span className='text-lg'>{fallbackTokenIcons[symbol] || '?'}</span>;
+    return <TokenLogo symbol={symbol} size={20} />;
   };
 
   // Get price from Jupiter data or fallback to local data
@@ -96,11 +159,23 @@ export const SwapForm = ({
     return localToken?.priceUsd || 0;
   };
 
-  // Simulate swap rate (simplified) - in production, use Jupiter API for rates
+  // Calculate estimated receive amount
   const fromPrice = getTokenPrice(fromToken);
   const toPrice = getTokenPrice(toToken);
-  const swapRate = fromPrice && toPrice ? fromPrice / toPrice : 1;
-  const estimatedReceive = amountNum * swapRate * (1 - slippage / 100);
+  
+  // Use Jupiter quote if available, otherwise fallback to simple calculation
+  const estimatedReceive = (() => {
+    if (quote) {
+      const toDecimals = getSymbolDecimals(
+        toToken,
+        tokenData?.get(toToken)
+      );
+      const out = parseFloat(quote.outAmount || '0');
+      return out / Math.pow(10, toDecimals);
+    }
+    return amountNum * (fromPrice / toPrice) * (1 - slippage / 100);
+  })();
+  
   const amountUsd = amountNum * fromPrice;
 
   const validateForm = () => {
@@ -131,6 +206,8 @@ export const SwapForm = ({
       toToken,
       amount: amountNum,
       slippage,
+      quote,
+      estimatedReceive,
     };
 
     console.log('swap_review_clicked', data);
@@ -183,11 +260,11 @@ export const SwapForm = ({
   };
 
   // Get available tokens that we have data for
-  const availableTokens = ['SOL', 'USDC', 'USDT'] as TokenSym[];
+  const availableTokens = ['SOL', 'USDC', 'USDT', 'BONK', 'RAY', 'JUP', 'ORCA', 'mSOL', 'JitoSOL', 'PYTH'] as TokenSym[];
 
   return (
     <>
-      <div className='p-4 pt-3'>
+      <div className='p-4 pt-3 mobile-padding'>
         {/* Header with Ultra V2 and settings - Compact */}
         <div className='flex items-center justify-between mb-2'>
           <button className='flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors'>
@@ -195,9 +272,21 @@ export const SwapForm = ({
             <span className='font-medium text-xs'>Ultra V2</span>
             <Settings2 className='h-3 w-3 text-muted-foreground' />
           </button>
-          <button className='p-1.5 rounded-lg hover:bg-muted/50 transition-colors'>
-            <Settings2 className='h-3.5 w-3.5 text-muted-foreground' />
-          </button>
+          <div className='flex items-center gap-2'>
+            <button
+              onClick={() => setUseRealSwap(!useRealSwap)}
+              className={`px-2 py-1 text-xs rounded-md transition-colors ${
+                useRealSwap 
+                  ? 'bg-primary/20 text-primary border border-primary/30' 
+                  : 'bg-muted/20 text-muted-foreground border border-border/30'
+              }`}
+            >
+              {useRealSwap ? 'Real Swap' : 'Demo Swap'}
+            </button>
+            <button className='p-1.5 rounded-lg hover:bg-muted/50 transition-colors'>
+              <Settings2 className='h-3.5 w-3.5 text-muted-foreground' />
+            </button>
+          </div>
         </div>
 
         {/* Two Adjacent Input Sections with Overlapping Swap Button */}
@@ -255,7 +344,7 @@ export const SwapForm = ({
                   onChange={(e) =>
                     handleAmountChange(e.target.value.replace(/,/g, ''))
                   }
-                  className='text-2xl font-semibold bg-transparent border-0 p-0 h-auto text-right focus-visible:ring-0 placeholder:text-muted-foreground/30 text-foreground'
+                  className='text-xl sm:text-2xl font-semibold bg-transparent border-0 p-0 h-auto text-right focus-visible:ring-0 placeholder:text-muted-foreground/30 text-foreground mobile-input'
                 />
                 <div className='text-xs text-muted-foreground mt-0.5'>
                   {formatCurrency(amountUsd, 'USD')}
@@ -301,10 +390,17 @@ export const SwapForm = ({
                     </span>
                   )}
                 </div>
-                <div className='text-2xl font-semibold text-muted-foreground/50'>
-                  {estimatedReceive > 0
-                    ? formatDisplayValue(estimatedReceive.toFixed(6))
-                    : '0.00'}
+                <div className='text-xl sm:text-2xl font-semibold text-muted-foreground/50 transition-all duration-300'>
+                  {loadingQuote ? (
+                    <div className='flex items-center gap-2 animate-pulse'>
+                      <RefreshCcw className='h-4 w-4 animate-spin' />
+                      <span className='mobile-text-sm'>Loading...</span>
+                    </div>
+                  ) : estimatedReceive > 0 ? (
+                    <span className='animate-fade-in'>{formatDisplayValue(estimatedReceive.toFixed(6))}</span>
+                  ) : (
+                    '0.00'
+                  )}
                 </div>
                 <div className='text-xs text-muted-foreground mt-0.5'>
                   {formatCurrency(estimatedReceive * toPrice, 'USD')}
@@ -337,10 +433,10 @@ export const SwapForm = ({
         {/* Action Button */}
         <Button
           onClick={handlePreview}
-          className={`w-full py-2.5 rounded-lg font-semibold text-sm ${
+          className={`w-full py-2.5 rounded-lg font-semibold text-sm transition-all duration-300 ${
             !amount || !!error || amountNum <= 0
               ? 'bg-muted text-muted-foreground cursor-not-allowed'
-              : 'bg-primary hover:bg-primary/90'
+              : 'bg-primary hover:bg-primary/90 hover:scale-[1.02] active:scale-[0.98]'
           }`}
           disabled={!amount || !!error || amountNum <= 0}
         >
@@ -383,17 +479,11 @@ export const SwapForm = ({
 
       {/* Token Selection Modal */}
       {showTokenSelect && (
-        <div
-          className='fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center'
-          onClick={() => setShowTokenSelect(null)}
-        >
-          <Card
-            className='w-96 max-h-[80vh] overflow-hidden'
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className='p-3 border-b'>
-              <h3 className='font-semibold text-sm'>{t('swap.selectToken')}</h3>
-            </div>
+        <Dialog open={!!showTokenSelect} onOpenChange={() => setShowTokenSelect(null)}>
+          <DialogContent className='sm:max-w-md max-h-[80vh] overflow-hidden'>
+            <DialogHeader>
+              <DialogTitle>{t('swap.selectToken')}</DialogTitle>
+            </DialogHeader>
             <div className='overflow-y-auto max-h-[60vh] p-2'>
               {availableTokens.map((tokenSymbol) => {
                 const token = tokens.find((t) => t.symbol === tokenSymbol);
@@ -455,8 +545,8 @@ export const SwapForm = ({
                 );
               })}
             </div>
-          </Card>
-        </div>
+          </DialogContent>
+        </Dialog>
       )}
 
       <SwapReviewModal
@@ -467,14 +557,33 @@ export const SwapForm = ({
         amount={amountNum}
         estimatedReceive={estimatedReceive}
         fee={amountNum * 0.002}
-        onConfirm={() => {
-          useWalletStore.getState().swapFake(fromToken, toToken, amountNum);
-          toast({
-            title: 'Swap confirmed',
-            description: `${amountNum} ${fromToken} -> ${estimatedReceive.toFixed(
-              4
-            )} ${toToken}`,
-          });
+        quote={quote}
+        onConfirm={async () => {
+          if (useRealSwap && swapReal) {
+            const success = await swapReal(fromToken, toToken, amountNum);
+            if (success) {
+              toast({
+                title: 'Real Swap confirmed',
+                description: `${amountNum} ${fromToken} -> ${estimatedReceive.toFixed(
+                  4
+                )} ${toToken}`,
+              });
+            } else {
+              toast({
+                title: 'Swap failed',
+                description: 'Failed to execute swap transaction',
+                variant: 'destructive',
+              });
+            }
+          } else {
+            useWalletStore.getState().swapFake(fromToken, toToken, amountNum);
+            toast({
+              title: 'Demo Swap confirmed',
+              description: `${amountNum} ${fromToken} -> ${estimatedReceive.toFixed(
+                4
+              )} ${toToken}`,
+            });
+          }
           setReviewOpen(false);
           setAmount('');
         }}

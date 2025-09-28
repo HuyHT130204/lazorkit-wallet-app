@@ -34,8 +34,14 @@ export const DrawerNav = ({ open, onOpenChange }: DrawerNavProps) => {
   ];
 
   const handleNavigation = (href: string) => {
-    router.push(href);
+    // Ensure viewport scrolls to top after navigating from deep scroll
+    router.push(href, { scroll: true });
     onOpenChange(false);
+    try {
+      const scroller = document.scrollingElement || document.documentElement;
+      // Use a microtask to scroll after sheet starts closing
+      setTimeout(() => scroller?.scrollTo({ top: 0, behavior: 'smooth' }), 0);
+    } catch {}
   };
 
   return (

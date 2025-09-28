@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Smartphone, QrCode, Copy, Link } from 'lucide-react';
 import { Button } from './ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
+import { ViewportModal } from './ui/viewport-modal';
 import { Card, CardContent } from './ui/card';
 import { CopyButton } from './ui/copy-button';
 import { QRCode } from '@/lib/utils/qr';
@@ -61,33 +61,24 @@ export const AddDeviceModal = ({ open, onOpenChange }: AddDeviceModalProps) => {
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className='sm:max-w-md'>
-        <DialogHeader>
-          <DialogTitle className='flex items-center space-x-2'>
-            <Smartphone className='h-5 w-5' />
-            <span>{t('devices.addDevice')}</span>
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className='space-y-6'>
+    <ViewportModal open={open} onOpenChange={onOpenChange} title={t('devices.addDevice')} className='max-w-md'>
+        <div className='space-y-4 p-6'>
           {/* Instructions */}
           <div className='text-center space-y-2'>
-            <p className='text-muted-foreground'>
-              Scan the QR code or copy the pairing link to add a new device to
-              your wallet.
+            <p className='text-muted-foreground mobile-text-xs'>
+              {t('devices.addDeviceInstructions')}
             </p>
           </div>
 
           {/* QR Code */}
           <Card>
-            <CardContent className='p-6'>
-              <div className='flex justify-center mb-4'>
-                <div className='bg-white p-4 rounded-lg'>
-                  <QRCode value={pairingLink} size={200} />
+            <CardContent className='p-4'>
+              <div className='flex justify-center mb-3'>
+                <div className='bg-white p-3 rounded-lg'>
+                  <QRCode value={pairingLink} size={140} />
                 </div>
               </div>
-              <p className='text-sm text-muted-foreground text-center'>
+              <p className='text-xs text-muted-foreground text-center mobile-text-xs'>
                 {t('devices.qrCode')}
               </p>
             </CardContent>
@@ -95,26 +86,26 @@ export const AddDeviceModal = ({ open, onOpenChange }: AddDeviceModalProps) => {
 
           {/* Pairing Link */}
           <div className='space-y-2'>
-            <label className='text-sm font-medium'>
+            <label className='text-sm font-medium mobile-text-xs'>
               {t('devices.pairingLink')}
             </label>
             <div className='flex items-center space-x-2'>
-              <div className='flex-1 p-3 bg-muted/50 rounded-lg'>
-                <p className='text-sm font-mono break-all'>{pairingLink}</p>
+              <div className='flex-1 p-2 bg-muted/50 rounded-lg'>
+                <p className='text-xs font-mono break-all mobile-text-xs'>{pairingLink}</p>
               </div>
               <CopyButton text={pairingLink} />
             </div>
           </div>
 
           {/* Demo Button */}
-          <div className='p-4 bg-muted/50 rounded-lg'>
-            <p className='text-sm text-muted-foreground mb-3'>
-              This is a demo. In a real app, you would scan the QR code or use
-              the pairing link.
-            </p>
-            <Button onClick={handleAddDemoDevice} className='w-full'>
+          <div className='p-3 bg-muted/50 rounded-lg'>
+            <Button
+              onClick={handleAddDemoDevice}
+              className='w-full'
+              size='sm'
+            >
               <Smartphone className='mr-2 h-4 w-4' />
-              Add Demo Device
+              {t('devices.addDemoDevice')}
             </Button>
           </div>
 
@@ -124,16 +115,20 @@ export const AddDeviceModal = ({ open, onOpenChange }: AddDeviceModalProps) => {
               variant='outline'
               onClick={() => onOpenChange(false)}
               className='flex-1'
+              size='sm'
             >
               {t('common.cancel')}
             </Button>
-            <Button onClick={handleCopyLink} className='flex-1'>
+            <Button 
+              onClick={handleCopyLink} 
+              className='flex-1'
+              size='sm'
+            >
               <Copy className='mr-2 h-4 w-4' />
               {t('devices.copyLink')}
             </Button>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+    </ViewportModal>
   );
 };

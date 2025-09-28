@@ -7,6 +7,7 @@ import { WalletBanner } from '@/components/wallet-banner';
 import { OnRampForm } from '@/components/onramp-form';
 import { SwapForm } from '@/components/swap-form';
 import { DepositModal } from '@/components/deposit-modal';
+import ErrorBoundary from '@/components/error-boundary';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { fetchCommonTokens, JupiterToken } from '@/lib/services/jupiter';
@@ -135,11 +136,21 @@ export default function BuyPage() {
                 </div>
               ) : hasWallet ? (
                 <>
-                  {activeTab === 'buy' && <OnRampForm tokenData={tokenData} />}
-                  {activeTab === 'swap' && <SwapForm tokenData={tokenData} />}
+                  {activeTab === 'buy' && (
+                    <ErrorBoundary>
+                      <OnRampForm tokenData={tokenData} />
+                    </ErrorBoundary>
+                  )}
+                  {activeTab === 'swap' && (
+                    <ErrorBoundary>
+                      <SwapForm tokenData={tokenData} />
+                    </ErrorBoundary>
+                  )}
                 </>
               ) : (
-                <OnRampForm tokenData={tokenData} />
+                <ErrorBoundary>
+                  <OnRampForm tokenData={tokenData} />
+                </ErrorBoundary>
               )}
             </div>
           </Card>

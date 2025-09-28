@@ -1,6 +1,6 @@
 'use client';
 
-import { Eye, EyeOff, Plus } from 'lucide-react';
+import { Eye, EyeOff, Plus, ExternalLink } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
@@ -59,76 +59,105 @@ export const WalletBanner = ({
     fiat === 'VND' ? totalBalance * rateUsdToVnd : totalBalance;
 
   return (
-    <Card className='glass-card border-border/50 hover:border-primary/30 transition-all duration-300 relative overflow-hidden group hover:shadow-lg'>
-      <CardContent className='p-4'>
-        <div className='space-y-2'>
-          {/* Public Key */}
-          <div className='flex items-center justify-between'>
-            <div className='flex items-center space-x-3'>
-              <div className='w-10 h-10 rounded-lg overflow-hidden border border-border/50 shadow-sm group-hover:shadow-md transition-all duration-300'>
-                <Blockie seed={pubkey || 'demo'} size={8} scale={4} />
+    <div className="relative w-full max-w-lg mx-auto">
+      <div 
+        className="relative rounded-2xl shadow-2xl overflow-hidden transform transition-all duration-500 hover:scale-[1.01] hover:shadow-[0_25px_70px_rgba(0,0,0,0.9)] aspect-[1.586/1]"
+        style={{
+          backgroundImage: 'url(/card_wallet.png)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat'
+        }}
+      >
+        {/* Card Content */}
+        <div className="relative z-10 p-6 h-full flex flex-col justify-between">
+          {/* Top Section */}
+          <div>
+            {/* Header */}
+            <div className="flex justify-between items-start mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-lg overflow-hidden border border-purple-500/30 shadow-sm">
+                  <Blockie seed={pubkey || 'demo'} size={8} scale={4} />
+                </div>
+                <span className="text-white font-bold text-sm tracking-wide">SOLANA</span>
               </div>
-              <div>
-                <p className='text-sm text-muted-foreground'>{t('wallet.publicKey')}</p>
-                <p className='font-mono text-sm font-medium'>
-                  {pubkey ? formatAddress(pubkey) : t('common.notAvailable')}
-                </p>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.5)]"></div>
+                <span className="text-gray-400 text-xs font-medium">Devnet</span>
               </div>
             </div>
-            {pubkey && <CopyButton text={pubkey} />}
+
+            {/* Contactless Payment Icon */}
+            <div className="absolute top-6 right-6">
+              <svg className="w-10 h-10 text-gray-600/30" viewBox="0 0 40 40" fill="none">
+                <path d="M8 20C8 14.5 11 9 16 9M12 20C12 16.5 14 14 16 14M16 20C16 18 16 20 16 20" 
+                      stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                <path d="M16 20C16 14.5 19 9 24 9M20 20C20 16.5 22 14 24 14M24 20C24 18 24 20 24 20" 
+                      stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                <path d="M24 20C24 14.5 27 9 32 9M28 20C28 16.5 30 14 32 14M32 20C32 18 32 20 32 20" 
+                      stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+            </div>
           </div>
 
-          {/* Total Balance */}
-          <div className='relative'>
-            <div className='relative bg-muted/30 rounded-xl p-4 group-hover:bg-muted/50 transition-all duration-300 border border-border/30'>
-              <div className='flex items-center justify-between'>
-                <div className='flex-1'>
-                  <p className='text-xs text-muted-foreground mb-1'>
-                    {t('wallet.totalBalance')}
+          {/* Bottom Section - Address and Portfolio Value */}
+          <div className="space-y-2">
+            {/* Address - positioned above Portfolio Value */}
+            <div className="flex items-center gap-2">
+              <code className="text-gray-200 font-mono text-lg tracking-[0.2em]">
+                {pubkey ? formatAddress(pubkey) : '----...----'}
+              </code>
+              {pubkey && (
+                <div className="flex items-center gap-1">
+                  <CopyButton text={pubkey} />
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className='h-7 w-7 p-0 hover:bg-white/10'
+                    onClick={() => window.open(`https://explorer.solana.com/address/${pubkey}?cluster=devnet`, '_blank')}
+                  >
+                    <ExternalLink className="h-4 w-4 text-gray-400" />
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {/* Portfolio Value */}
+            <div className="flex justify-between items-end">
+              <div>
+                <p className="text-gray-500 text-[10px] uppercase tracking-widest mb-1 font-medium">
+                  {t('wallet.totalBalance')}
+                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-white text-3xl font-bold tracking-tight">
+                    {showBalance
+                      ? (loadingPrices && totalBalance === 0
+                        ? '—'
+                        : formatCurrency(displayBalance, fiat))
+                      : '••••••'}
                   </p>
-                  <div className='flex items-center space-x-2'>
-                    <p className='text-2xl font-bold text-foreground min-w-[120px]'>
-                      {showBalance
-                        ? (loadingPrices && totalBalance === 0
-                          ? '—'
-                          : formatCurrency(displayBalance, fiat))
-                        : '••••••'}
-                    </p>
-                    {!hideDeposit && hasNoAssets && hasNoAssets() && (
-                      <span className='text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/30'>New</span>
+                  <Button
+                    variant='ghost'
+                    size='icon'
+                    onClick={() => setShowBalance(!showBalance)}
+                    className='h-8 w-8 p-0 hover:bg-white/10 transition-all duration-200'
+                  >
+                    {showBalance ? (
+                      <EyeOff className='h-4 w-4 text-gray-400' />
+                    ) : (
+                      <Eye className='h-4 w-4 text-gray-400' />
                     )}
-                    <Button
-                      variant='ghost'
-                      size='icon'
-                      onClick={() => setShowBalance(!showBalance)}
-                      className='h-7 w-7 p-0 hover:bg-primary/10 transition-all duration-200'
-                    >
-                      {showBalance ? (
-                        <EyeOff className='h-4 w-4' />
-                      ) : (
-                        <Eye className='h-4 w-4' />
-                      )}
-                    </Button>
-                  </div>
+                  </Button>
                 </div>
               </div>
+              <div className="text-right">
+                <p className="text-purple-400 font-bold text-xl tracking-wider">LazorKit</p>
+                <p className="text-gray-500 text-xs tracking-wide">Signature</p>
+              </div>
             </div>
           </div>
-
-          {/* Quick Actions */}
-          {!hideDeposit && (
-            <Button
-              variant='outline'
-              size='sm'
-              className='w-full hover:bg-primary/10 hover:border-primary/50 transition-all duration-200'
-              onClick={onDepositClick}
-            >
-              <Plus className='mr-2 h-4 w-4' />
-              {t('wallet.deposit')}
-            </Button>
-          )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };

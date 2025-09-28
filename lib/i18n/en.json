@@ -126,6 +126,8 @@
   "wallet": {
     "publicKey": "Public Key",
     "totalBalance": "Total Balance",
+    "portfolioValue": "Portfolio Value",
+    "connected": "Connected",
     "hideBalance": "Hide Balance",
     "showBalance": "Show Balance",
     "send": "Send",
@@ -148,7 +150,16 @@
     "confirm": "Confirm Send",
     "invalidAddress": "Invalid address format",
     "insufficientBalance": "Insufficient balance",
-    "scanUnavailable": "QR scanner not available in demo"
+    "scanUnavailable": "QR scanner not available in demo",
+    "enterRecipient": "Please enter recipient address",
+    "availableBalance": "Available Balance",
+    "scanQR": "Scan QR",
+    "sending": "Sending...",
+    "transactionDetails": "Transaction Details",
+    "totalAmount": "Total Amount",
+    "transactionSent": "Transaction sent",
+    "sentSuccessfully": "sent successfully",
+    "pasteFailed": "Failed to paste from clipboard"
   },
   "deposit": {
     "title": "Deposit Tokens",
@@ -157,7 +168,24 @@
     "qrCode": "QR Code",
     "copyAddress": "Copy Address",
     "scanToDeposit": "Scan this QR code to deposit",
-    "depositNote": "Send tokens to this address to deposit them to your wallet"
+    "depositNote": "Send tokens to this address to deposit them to your wallet",
+    "noWallet": "No Wallet Available",
+    "noWalletDesc": "Please generate a wallet first to receive deposits",
+    "scanQRCode": "Scan QR Code",
+    "scanQRDesc": "Use your mobile wallet to scan this QR code",
+    "downloadQR": "Download QR",
+    "share": "Share",
+    "depositAddress": "Deposit Address",
+    "instructions": "Instructions",
+    "instruction1": "Copy the address or scan the QR code with your mobile wallet",
+    "instruction2": "Send tokens to this address from any Solana wallet",
+    "instruction3": "Tokens will appear in your wallet after confirmation",
+    "qrDownloaded": "QR Code Downloaded",
+    "qrDownloadedDesc": "QR code has been saved to your device",
+    "shareTitle": "Deposit Address",
+    "shareText": "Send tokens to this Solana address",
+    "addressCopied": "Address Copied",
+    "addressCopiedDesc": "Deposit address has been copied to clipboard"
   },
   "apps": {
     "title": "Solana Apps",
@@ -211,7 +239,10 @@
     "copyLink": "Copy Link",
     "confirmRemove": "Are you sure you want to remove this device?",
     "deviceRemoved": "Device removed successfully",
-    "linkCopied": "Pairing link copied to clipboard"
+    "linkCopied": "Pairing link copied to clipboard",
+    "addDeviceInstructions": "Scan the QR code or copy the pairing link to add a new device to your wallet.",
+    "addDemoDevice": "Add Demo Device",
+    "linkCopiedDesc": "Pairing link copied to clipboard"
   },
   "settings": {
     "title": "Settings",
@@ -242,6 +273,24 @@
     "currencies": {
       "usd": "USD",
       "vnd": "VND"
+    },
+    "walletManager": {
+      "title": "Wallet Manager",
+      "currentAddress": "Current Address",
+      "generateNew": "Generate New Wallet",
+      "refreshBalances": "Refresh Balances",
+      "setCustomAddress": "Set Custom Address",
+      "enterSolanaAddress": "Enter Solana address...",
+      "setAddress": "Set Address",
+      "connectionInfo": "Connection Info",
+      "newWalletGenerated": "New wallet generated",
+      "newWalletGeneratedDesc": "A new wallet address has been created",
+      "balancesRefreshed": "Balances refreshed",
+      "balancesRefreshedDesc": "Token balances have been updated",
+      "refreshFailed": "Refresh failed",
+      "refreshFailedDesc": "Using demo data - RPC connection unavailable",
+      "addressSet": "Address set",
+      "addressSetDesc": "Custom address has been set"
     }
   },
   "success": {
@@ -251,7 +300,8 @@
     "token": "Token",
     "publicKey": "Public Key",
     "returnToApp": "Return to App",
-    "walletReady": "Wallet is ready!"
+    "walletReady": "Wallet is ready!",
+    "walletReadyDesc": "Your wallet is now ready to use!"
   },
   "errors": {
     "generic": "Something went wrong. Please try again.",
