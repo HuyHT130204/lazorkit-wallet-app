@@ -61,7 +61,7 @@ export const WalletBanner = ({
   return (
     <div className="relative w-full max-w-lg mx-auto">
       <div 
-        className="relative rounded-2xl shadow-2xl overflow-hidden transform transition-all duration-500 hover:scale-[1.01] hover:shadow-[0_25px_70px_rgba(0,0,0,0.9)] aspect-[1.586/1]"
+        className="relative rounded-2xl shadow-2xl overflow-hidden transform transition-all duration-500 hover:scale-[1.01] hover:shadow-[0_25px_70px_rgba(0,0,0,0.9)] aspect-[1.586/1] card-entrance"
         style={{
           backgroundImage: 'url(/card_wallet.png)',
           backgroundSize: 'cover',

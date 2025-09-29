@@ -7,6 +7,7 @@ import { TokenDetailModal } from './token-detail-modal';
 import { useWalletStore, TokenHolding } from '@/lib/store/wallet';
 import { AssetsActivity } from './assets-activity';
 import { fetchCommonTokens, JupiterToken } from '@/lib/services/jupiter';
+import { fetchRealTokenData } from '@/lib/services/real-token-service';
 import { Button } from './ui/button';
 import {
   formatCurrency,
@@ -32,7 +33,7 @@ const fallbackTokenIcons: Record<string, string> = {
 };
 
 export const AssetsTab = () => {
-  const { tokens, fiat, rateUsdToVnd, hasAssets, hasNoAssets, getNumNonZeroTokens, getVisibleTokens } = useWalletStore();
+  const { tokens, fiat, rateUsdToVnd, hasAssets, hasNoAssets, getNumNonZeroTokens, getVisibleTokens, pubkey, refreshBalances } = useWalletStore();
   const router = useRouter();
   const [showBalance, setShowBalance] = useState(true);
   const [selectedToken, setSelectedToken] = useState<TokenHolding | null>(null);
@@ -44,14 +45,21 @@ export const AssetsTab = () => {
   const [hideZero, setHideZero] = useState<boolean>(false);
   const isNoAssets = hasNoAssets ? hasNoAssets() : (!hasAssets ? tokens.length === 0 : !hasAssets());
 
-  // Fetch token data on mount
+  // Fetch token data on mount and when pubkey changes
   useEffect(() => {
     const loadTokenData = async () => {
       try {
         setLoading(true);
         setError(null);
+        
+        // Load Jupiter metadata
         const jupiterTokens = await fetchCommonTokens();
         setTokenData(jupiterTokens);
+        
+        // Refresh real balances if we have a pubkey
+        if (pubkey && refreshBalances) {
+          await refreshBalances();
+        }
       } catch (error) {
         console.error('Failed to load token data:', error);
         setError('failed');
@@ -61,7 +69,7 @@ export const AssetsTab = () => {
     };
 
     loadTokenData();
-  }, []);
+  }, [pubkey, refreshBalances]);
 
   // Default hideZero behavior: if user already has assets, hide zero balances by default
   useEffect(() => {
@@ -136,7 +144,7 @@ export const AssetsTab = () => {
         {loading && (
           <>
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className='h-16 rounded-lg bg-muted/30 animate-pulse' />
+              <div key={i} className='h-16 rounded-lg bg-muted/30 smooth-loading' />
             ))}
           </>
         )}
@@ -145,13 +153,20 @@ export const AssetsTab = () => {
           <div className='text-center py-10 border rounded-lg bg-destructive/5 border-destructive/40'>
             <div className='text-sm text-destructive mb-3'>{t('common.error')}</div>
             <div className='text-xs text-muted-foreground mb-4'>Failed to load token metadata</div>
-            <Button size='sm' variant='outline' className='inline-flex items-center gap-1' onClick={() => {
+            <Button size='sm' variant='outline' className='inline-flex items-center gap-1' onClick={async () => {
               setError(null);
               setLoading(true);
-              fetchCommonTokens()
-                .then(setTokenData)
-                .catch(() => setError('failed'))
-                .finally(() => setLoading(false));
+              try {
+                const jupiterTokens = await fetchCommonTokens();
+                setTokenData(jupiterTokens);
+                if (pubkey && refreshBalances) {
+                  await refreshBalances();
+                }
+              } catch (error) {
+                setError('failed');
+              } finally {
+                setLoading(false);
+              }
             }}>
               <RefreshCcw className='h-4 w-4' />
               {t('common.retry')}
@@ -183,7 +198,7 @@ export const AssetsTab = () => {
           return (
             <Card
               key={token.symbol}
-              className='cursor-pointer hover:shadow-lg hover:border-primary/30 transition-all duration-300 glass-card'
+              className='cursor-pointer hover:shadow-lg hover:border-primary/30 transition-all duration-300 glass-card smooth-hover stagger-item'
               onClick={() => handleTokenClick(token)}
             >
               <CardContent className='p-4'>

@@ -32,7 +32,7 @@ export const DepositModalCompact = ({ open, onOpenChange }: DepositModalCompactP
 
   const handleShare = async () => {
     if (!pubkey) {
-      console.warn('No pubkey available for sharing');
+      console.warn(t('notifications.noPubkeySharing'));
       return;
     }
 
@@ -56,7 +56,7 @@ export const DepositModalCompact = ({ open, onOpenChange }: DepositModalCompactP
 
   const handleCopyAddress = () => {
     if (!pubkey) {
-      console.warn('No pubkey available for copying');
+      console.warn(t('notifications.noPubkeyCopying'));
       return;
     }
 
@@ -147,8 +147,23 @@ export const DepositModalCompact = ({ open, onOpenChange }: DepositModalCompactP
             </p>
           </div>
           
-          <div className="flex justify-center p-2 bg-white rounded-lg border">
-            <QRCode value={pubkey} size={100} />
+          <div className="flex justify-center p-4 bg-white rounded-xl border-2 border-primary/20 shadow-lg">
+            <div className="relative">
+              <QRCode 
+                value={pubkey} 
+                size={120} 
+                bgColor="#ffffff"
+                fgColor="#000000"
+                level="M"
+                includeMargin={true}
+                marginSize={2}
+              />
+              {/* Decorative corner elements */}
+              <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-primary rounded-tl-lg"></div>
+              <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-primary rounded-tr-lg"></div>
+              <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-primary rounded-bl-lg"></div>
+              <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-primary rounded-br-lg"></div>
+            </div>
           </div>
 
           <div className="flex gap-1 justify-center">

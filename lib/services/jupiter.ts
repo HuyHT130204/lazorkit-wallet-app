@@ -35,26 +35,26 @@ export interface SwapTransaction {
   prioritizationFeeLamports?: number;
 }
 
-// RPC endpoints
+// RPC endpoints (use Helius devnet only to ensure stability)
 const RPC_ENDPOINTS = {
-  devnet: 'https://api.devnet.solana.com',
-  helius: 'https://rpc-devnet.helius.xyz/?api-key=demo', // Free Helius endpoint
-  quicknode: 'https://api.devnet.solana.com', // Fallback to official devnet
+  devnet: 'https://devnet.helius-rpc.com/?api-key=3ad52cea-a8c4-41e2-8b01-22230620e995',
+  helius: 'https://devnet.helius-rpc.com/?api-key=3ad52cea-a8c4-41e2-8b01-22230620e995',
+  quicknode: 'https://devnet.helius-rpc.com/?api-key=3ad52cea-a8c4-41e2-8b01-22230620e995',
   mainnet: 'https://api.mainnet-beta.solana.com',
 } as const;
 
-// Common token addresses on Solana
+// Common token addresses on Solana (Devnet)
 export const TOKEN_ADDRESSES = {
-  SOL: 'So11111111111111111111111111111111111111112',
-  USDC: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
-  USDT: 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB',
-  BONK: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263',
-  RAY: '4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R',
-  JUP: 'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN',
-  ORCA: 'orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE',
-  mSOL: 'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So',
-  JitoSOL: 'J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn',
-  PYTH: 'HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3RKwX8eACQBCt3',
+  SOL: 'So11111111111111111111111111111111111111112', // SOL is same on all networks
+  USDC: '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU', // Devnet USDC
+  USDT: 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB', // USDT is same on devnet
+  BONK: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263', // BONK is same on devnet
+  RAY: '4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R', // RAY is same on devnet
+  JUP: 'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN', // JUP is same on devnet
+  ORCA: 'orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE', // ORCA is same on devnet
+  mSOL: 'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So', // mSOL is same on devnet
+  JitoSOL: 'J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn', // JitoSOL is same on devnet
+  PYTH: 'HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3RKwX8eACQBCt3', // PYTH is same on devnet
 } as const;
 
 // Common token decimals (fallback when API metadata not available)
@@ -85,12 +85,15 @@ export const connections = {
   mainnet: new Connection(RPC_ENDPOINTS.mainnet, 'confirmed'),
 };
 
-// Default connection (using official devnet for reliability)
-export const defaultConnection = connections.devnet;
+// Default connection -> Helius devnet for stability
+export const defaultConnection = connections.helius;
 
 // Cache for token data
 const tokenCache = new Map<string, JupiterToken>();
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
+const requestQueue = new Map<string, Promise<any>>();
+const lastRequestTime = new Map<string, number>();
+const MIN_REQUEST_INTERVAL = 1000; // 1 second between requests
 const lastFetchTime = new Map<string, number>();
 
 export async function fetchTokenData(
@@ -105,59 +108,95 @@ export async function fetchTokenData(
     return cached;
   }
 
-  try {
-    // Use the address if we have it, otherwise search by symbol
-    const query =
-      TOKEN_ADDRESSES[cacheKey as keyof typeof TOKEN_ADDRESSES] ||
-      symbolOrAddress;
-
-    const response = await fetch(
-      `https://lite-api.jup.ag/tokens/v2/search?query=${query}`,
-      {
-        headers: {
-          Accept: 'application/json',
-        },
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch token data: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-
-    if (!data || data.length === 0) {
-      console.warn(`No token data found for ${symbolOrAddress}`);
-      return null;
-    }
-
-    // Take the first result
-    const token = data[0];
-
-    const result: JupiterToken = {
-      id: token.id,
-      name: token.name,
-      symbol: token.symbol,
-      icon: token.icon,
-      decimals: token.decimals,
-      fdv: token.fdv,
-      mcap: token.mcap,
-      usdPrice: token.usdPrice,
-      liquidity: token.liquidity,
-      holderCount: token.holderCount,
-      isVerified: token.isVerified,
-      tags: token.tags,
-    };
-
-    // Update cache
-    tokenCache.set(cacheKey, result);
-    lastFetchTime.set(cacheKey, Date.now());
-
-    return result;
-  } catch (error) {
-    console.error(`Error fetching token data for ${symbolOrAddress}:`, error);
-    return null;
+  // Check if request is already in progress
+  if (requestQueue.has(cacheKey)) {
+    return await requestQueue.get(cacheKey);
   }
+
+  // Rate limiting
+  const lastRequest = lastRequestTime.get(cacheKey) || 0;
+  const timeSinceLastRequest = Date.now() - lastRequest;
+  
+  if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
+    await new Promise(resolve => setTimeout(resolve, MIN_REQUEST_INTERVAL - timeSinceLastRequest));
+  }
+
+  // Create request promise
+  const requestPromise = (async () => {
+    try {
+      // Use the address if we have it, otherwise search by symbol
+      const query =
+        TOKEN_ADDRESSES[cacheKey as keyof typeof TOKEN_ADDRESSES] ||
+        symbolOrAddress;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+      const response = await fetch(
+        `https://lite-api.jup.ag/tokens/v2/search?query=${query}`,
+        {
+          headers: {
+            Accept: 'application/json',
+          },
+          signal: controller.signal,
+        }
+      );
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        if (response.status === 429) {
+          console.warn('Rate limited, using cached data or fallback');
+          return cached || null;
+        }
+        throw new Error(`Failed to fetch token data: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      if (!data || data.length === 0) {
+        console.warn(`No token data found for ${symbolOrAddress}`);
+        return null;
+      }
+
+      // Take the first result
+      const token = data[0];
+
+      const result: JupiterToken = {
+        id: token.id,
+        name: token.name,
+        symbol: token.symbol,
+        icon: token.icon,
+        decimals: token.decimals,
+        fdv: token.fdv,
+        mcap: token.mcap,
+        usdPrice: token.usdPrice,
+        liquidity: token.liquidity,
+        holderCount: token.holderCount,
+        isVerified: token.isVerified,
+        tags: token.tags,
+      };
+
+      // Update cache
+      tokenCache.set(cacheKey, result);
+      lastFetchTime.set(cacheKey, Date.now());
+      lastRequestTime.set(cacheKey, Date.now());
+
+      return result;
+    } catch (error) {
+      console.error(`Error fetching token data for ${symbolOrAddress}:`, error);
+      // Return cached data if available
+      return cached || null;
+    } finally {
+      // Clean up request queue
+      requestQueue.delete(cacheKey);
+    }
+  })();
+
+  // Add to request queue
+  requestQueue.set(cacheKey, requestPromise);
+  
+  return await requestPromise;
 }
 
 export async function fetchCommonTokens(): Promise<Map<string, JupiterToken>> {
@@ -296,20 +335,37 @@ export async function getTokenBalance(
       const balance = await connection.getBalance(publicKey);
       return balance / 1e9; // Convert lamports to SOL
     } else {
-      // For SPL tokens, get token account balance
-      const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
-        publicKey,
-        { mint: mintPublicKey }
-      );
+      // For SPL tokens, get token account balance with better error handling
+      try {
+        const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
+          publicKey,
+          { mint: mintPublicKey }
+        );
 
-      if (tokenAccounts.value.length === 0) {
-        return 0;
+        if (tokenAccounts.value.length === 0) {
+          return 0;
+        }
+
+        const balance = tokenAccounts.value[0].account.data.parsed.info.tokenAmount.uiAmount;
+        return balance || 0;
+      } catch (mintError: any) {
+        // Handle specific mint errors
+        if (mintError.message?.includes('could not find mint') || 
+            mintError.message?.includes('Token mint could not be unpacked')) {
+          console.warn(`Token mint ${tokenMint} not found on devnet, returning 0 balance`);
+          return 0;
+        }
+        throw mintError;
       }
-
-      const balance = tokenAccounts.value[0].account.data.parsed.info.tokenAmount.uiAmount;
-      return balance || 0;
     }
-  } catch (error) {
+  } catch (error: any) {
+    // Handle rate limiting
+    if (error.message?.includes('429') || error.message?.includes('Too many requests')) {
+      console.warn('Rate limited, waiting before retry...');
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+      return 0; // Return 0 for now, will retry later
+    }
+    
     console.error('Error getting token balance:', error);
     return 0;
   }

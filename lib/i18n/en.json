@@ -310,5 +310,26 @@
     "insufficientFunds": "Insufficient funds",
     "invalidInput": "Invalid input",
     "operationFailed": "Operation failed"
+  },
+  "notifications": {
+    "addressCopied": "Address copied",
+    "addressCopiedDesc": "Wallet address copied to clipboard",
+    "walletGenerated": "New wallet generated",
+    "walletGeneratedDesc": "A new wallet address has been generated",
+    "walletGeneratedFailed": "Generate wallet failed",
+    "walletGeneratedFailedDesc": "Failed to generate new wallet",
+    "invalidAddress": "Invalid address",
+    "invalidAddressDesc": "Invalid Solana address",
+    "addressSetFailed": "Set address failed",
+    "addressSetFailedDesc": "Failed to set custom address",
+    "enterValidAmount": "Please enter a valid amount",
+    "realSwap": "Real Swap",
+    "demoSwap": "Demo Swap",
+    "realSwapConfirmed": "Real Swap confirmed",
+    "realSwapFailed": "Swap failed",
+    "realSwapFailedDesc": "Failed to execute swap transaction",
+    "demoSwapConfirmed": "Demo Swap confirmed",
+    "noPubkeySharing": "No pubkey available for sharing",
+    "noPubkeyCopying": "No pubkey available for copying"
   }
 }

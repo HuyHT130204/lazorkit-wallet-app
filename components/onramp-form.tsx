@@ -1,12 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { Settings2, ChevronDown } from 'lucide-react';
+import { Settings2, ChevronDown, Search, X } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card } from './ui/card';
 import { TokenLogo } from './ui/token-logo';
 import { OnRampPreviewModal } from './onramp-preview-modal';
+import { createWhateeOrder } from '@/lib/services/payment';
+import { Payment_js_src } from '@/lib/config/payment';
 import { useRouter } from 'next/navigation';
 import {
   useWalletStore,
@@ -21,11 +23,13 @@ import {
   generateOrderId,
 } from '@/lib/utils/format';
 import { t } from '@/lib/i18n';
-import { JupiterToken } from '@/lib/services/jupiter';
+import { JupiterToken, TOKEN_ADDRESSES } from '@/lib/services/jupiter';
 
 interface OnRampFormProps {
   onPreview?: (data: OnRampData) => void;
   tokenData?: Map<string, JupiterToken>;
+  onSwitchToSwap?: (params: { fromToken: TokenSym; toToken?: TokenSym }) => void;
+  initialFromCurrency?: Fiat;
 }
 
 interface OnRampData {
@@ -55,26 +59,26 @@ const fallbackTokenIcons: Record<string, string> = {
   XYZ: '✨',
 };
 
-export const OnRampForm = ({ onPreview, tokenData }: OnRampFormProps) => {
+export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCurrency }: OnRampFormProps) => {
   const { rateUsdToVnd } = useWalletStore();
   const router = useRouter();
-  const [fromCurrency, setFromCurrency] = useState<Fiat>('VND'); // Default to VND
+  const [fromCurrency, setFromCurrency] = useState<Fiat>(initialFromCurrency || 'USD');
   const [toToken, setToToken] = useState<TokenSym>('USDC');
   const [amount, setAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card');
-  const [selectedQuickAmount, setSelectedQuickAmount] = useState<number | null>(
-    null
-  );
+  const [selectedQuickAmount, setSelectedQuickAmount] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [previewOpen, setPreviewOpen] = useState(false);
   const [showCurrencySelect, setShowCurrencySelect] = useState(false);
   const [showTokenSelect, setShowTokenSelect] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isCreatingOrder, setIsCreatingOrder] = useState(false);
 
   const amountNum = parseFloat(amount.replace(/,/g, '')) || 0;
   const amountUsd =
     fromCurrency === 'USD'
       ? amountNum
-      : convertCurrency(amountNum, 'VND', 'USD', 27000); // Fixed rate 27,000 VND = 1 USD
+      : convertCurrency(amountNum, 'VND', 'USD', 27000);
 
   // Get token price from Jupiter data
   const tokenJupiterData = tokenData?.get(toToken);
@@ -84,28 +88,45 @@ export const OnRampForm = ({ onPreview, tokenData }: OnRampFormProps) => {
   // Quick amount options in USD
   const quickAmounts = [50, 100, 200, 500];
 
-  // Get token icon from Jupiter data or use fallback
+  // Known icon overrides for stability when Jupiter icon is missing
+  const ICON_OVERRIDES: Partial<Record<TokenSym, string>> = {
+    USDC: 'https://cryptologos.cc/logos/usd-coin-usdc-logo.svg?v=026',
+    USDT: 'https://cryptologos.cc/logos/tether-usdt-logo.svg?v=026',
+    SOL: 'https://cryptologos.cc/logos/solana-sol-logo.svg?v=026',
+  };
+  const ICON_FALLBACK_2: Partial<Record<TokenSym, string>> = {
+    USDC: 'https://assets.coingecko.com/coins/images/6319/standard/USD_Coin_icon.png',
+    USDT: 'https://assets.coingecko.com/coins/images/325/standard/Tether.png',
+    SOL: 'https://assets.coingecko.com/coins/images/4128/standard/solana.png',
+  };
+
+  // Always render TokenLogo and optionally overlay external icon (ensures avatar always visible)
   const getTokenIcon = (symbol: string) => {
     const token = tokenData?.get(symbol);
-    if (token?.icon) {
-      return (
-        <>
+    const override = ICON_OVERRIDES[symbol as TokenSym];
+    return (
+      <div className='relative w-5 h-5'>
+        <TokenLogo symbol={symbol} size={20} />
+        {(token?.icon || override) && (
           <img
-            src={token.icon}
+            src={(token?.icon as string) || override!}
             alt={symbol}
-            className='w-5 h-5 rounded-full'
+            className='absolute inset-0 w-full h-full rounded-full'
+            data-fallback={ICON_FALLBACK_2[symbol as TokenSym] || ''}
             onError={(e) => {
-              // Fallback to text icon if image fails to load
-              e.currentTarget.style.display = 'none';
-              const nextElement = e.currentTarget.nextSibling as HTMLElement;
-              nextElement?.classList.remove('hidden');
+              const img = e.currentTarget as HTMLImageElement;
+              const next = img.getAttribute('data-fallback');
+              if (next) {
+                img.setAttribute('data-fallback', '');
+                img.src = next;
+              } else {
+                img.style.display = 'none';
+              }
             }}
           />
-          <TokenLogo symbol={symbol} size={20} />
-        </>
-      );
-    }
-    return <TokenLogo symbol={symbol} size={20} />;
+        )}
+      </div>
+    );
   };
 
   const validateForm = () => {
@@ -143,25 +164,20 @@ export const OnRampForm = ({ onPreview, tokenData }: OnRampFormProps) => {
   };
 
   const handleAmountChange = (value: string) => {
-    // Remove commas for processing
     const cleanValue = value.replace(/,/g, '');
-    // Only allow numbers and decimal point
     if (cleanValue && !/^\d*\.?\d*$/.test(cleanValue)) return;
     setAmount(cleanValue);
-    setSelectedQuickAmount(null); // Clear selected quick amount when manually typing
+    setSelectedQuickAmount(null);
     setError('');
   };
 
   const handleQuickAmountClick = (usdAmount: number) => {
-    // Calculate the fiat amount based on selected currency
-    const fiatAmount = fromCurrency === 'USD' ? usdAmount : usdAmount * 27000; // Convert to VND
-
+    const fiatAmount = fromCurrency === 'USD' ? usdAmount : usdAmount * 27000;
     setAmount(fiatAmount.toString());
     setSelectedQuickAmount(usdAmount);
     setError('');
   };
 
-  // Format display value with commas
   const formatDisplayValue = (val: string) => {
     if (!val) return '';
     const parts = val.split('.');
@@ -174,6 +190,12 @@ export const OnRampForm = ({ onPreview, tokenData }: OnRampFormProps) => {
     { value: 'applepay' as PaymentMethod, label: 'Apple Pay', icon: '/apple_logo.png' },
     { value: 'vnpay' as PaymentMethod, label: 'VNPAY QR', icon: '/vietnam_logo.png' },
   ];
+
+  // Filter tokens based on search
+  const allTokens: TokenSym[] = ['SOL','USDC','USDT','BONK','RAY','JUP','ORCA','mSOL','JitoSOL','PYTH'];
+  const filteredTokens = allTokens.filter(token => 
+    token.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <>
@@ -275,7 +297,6 @@ export const OnRampForm = ({ onPreview, tokenData }: OnRampFormProps) => {
           <div className='text-xs text-muted-foreground mb-1'>{t('onRamp.quickAmount')}</div>
           <div className='flex gap-1'>
             {quickAmounts.map((usdAmount) => {
-              // Check if this quick amount is selected
               const isSelected =
                 selectedQuickAmount === usdAmount &&
                 (fromCurrency === 'USD'
@@ -352,21 +373,66 @@ export const OnRampForm = ({ onPreview, tokenData }: OnRampFormProps) => {
         </div>
       </div>
 
-      {/* Currency Selection Modal */}
+      {/* Currency Selection Modal - IMPROVED */}
       {showCurrencySelect && (
         <div
-          className='fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center'
+          className='fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center transition-all duration-300 ease-out'
+          style={{ animation: 'fadeIn 0.2s ease-out' }}
           onClick={() => setShowCurrencySelect(false)}
         >
+           <style jsx>{`
+            @keyframes fadeIn {
+              from { opacity: 0; }
+              to { opacity: 1; }
+            }
+            @keyframes slideUp {
+              from { 
+                opacity: 0;
+                transform: translateY(20px) scale(0.95);
+              }
+              to { 
+                opacity: 1;
+                transform: translateY(0) scale(1);
+              }
+            }
+             .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+             .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+             .custom-scrollbar::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / 0.3); border-radius: 3px; }
+             .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.5); }
+          `}</style>
           <Card
-            className='w-80 overflow-hidden'
+            className='w-full max-w-md mx-4 sm:mx-0 overflow-hidden shadow-2xl border-border/60'
+            style={{ animation: 'slideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className='p-3 border-b'>
-              <h3 className='font-semibold text-sm'>{t('onRamp.selectCurrency')}</h3>
+            {/* Header with close button */}
+            <div className='flex items-center justify-between p-4 border-b border-border/60 bg-card/50 backdrop-blur-sm'>
+              <h3 className='font-semibold text-base'>{t('onRamp.selectCurrency')}</h3>
+              <button 
+                onClick={() => setShowCurrencySelect(false)}
+                className='p-1 rounded-lg hover:bg-muted/50 transition-all duration-200'
+              >
+                <X className='h-4 w-4 text-muted-foreground' />
+              </button>
             </div>
-            <div className='p-2'>
-              {(['VND', 'USD'] as Fiat[]).map((currency) => (
+
+            {/* Search bar at top */}
+            <div className='px-3 pt-3 pb-2'>
+              <div className='relative'>
+                <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
+                <input
+                  type='text'
+                  placeholder='Search tokens...'
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className='w-full pl-9 pr-3 py-2 bg-muted/30 border border-border/40 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all duration-200'
+                />
+              </div>
+            </div>
+
+            {/* Currency Options */}
+            <div className='p-3 space-y-1.5'>
+              {(['VND', 'USD'] as Fiat[]).map((currency, index) => (
                 <button
                   key={currency}
                   onClick={() => {
@@ -375,38 +441,127 @@ export const OnRampForm = ({ onPreview, tokenData }: OnRampFormProps) => {
                     setAmount('');
                     setSelectedQuickAmount(null);
                   }}
-                  className={`w-full flex items-center gap-2.5 p-2.5 rounded-lg transition-colors ${
+                  style={{ animationDelay: `${index * 50}ms` }}
+                  className={`w-full flex items-center gap-3 p-3.5 rounded-xl transition-all duration-200 hover:scale-[1.02] ${
                     currency === fromCurrency
-                      ? 'bg-primary/10 border border-primary/30'
-                      : 'hover:bg-muted/50'
+                      ? 'bg-primary/15 border-2 border-primary/40 shadow-sm'
+                      : 'bg-muted/30 hover:bg-muted/50 border-2 border-transparent'
                   }`}
                 >
-                  <span className='text-xl text-primary'>
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl ${
+                    currency === fromCurrency ? 'bg-primary/20' : 'bg-background/50'
+                  }`}>
                     {currencyIcons[currency]}
-                  </span>
-                  <span className='font-medium text-sm'>{currency}</span>
+                  </div>
+                  <div className='flex-1 text-left'>
+                    <div className='font-semibold text-sm'>{currency}</div>
+                    <div className='text-xs text-muted-foreground'>
+                      {currency === 'VND' ? 'Vietnamese Dong' : 'US Dollar'}
+                    </div>
+                  </div>
+                  {currency === fromCurrency && (
+                    <div className='w-5 h-5 rounded-full bg-primary flex items-center justify-center'>
+                      <div className='w-2 h-2 rounded-full bg-primary-foreground' />
+                    </div>
+                  )}
                 </button>
               ))}
             </div>
+
+            {/* Divider */}
+            <div className='px-4 py-2'>
+              <div className='border-t border-border/40 relative'>
+                <div className='absolute -top-2.5 left-1/2 -translate-x-1/2 px-2 bg-card'>
+                  <span className='text-[10px] text-muted-foreground uppercase tracking-wider font-medium'>
+                    {t('swap.selectToken')}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            
+
+            {/* Token Options - Scrollable */}
+            <div className='px-3 pb-3 max-h-[280px] overflow-y-auto custom-scrollbar'>
+              <div className='space-y-1'>
+                {filteredTokens.map((sym, index) => {
+                  const jup = tokenData?.get(sym);
+                  return (
+                    <button
+                      key={`fiat-to-token-${sym}`}
+                      onClick={() => {
+                        setShowCurrencySelect(false);
+                        setSearchTerm('');
+                        onSwitchToSwap?.({ fromToken: sym });
+                      }}
+                      style={{ animationDelay: `${index * 30}ms` }}
+                      className='w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-200 bg-muted/20 hover:bg-muted/40 hover:scale-[1.01] border border-transparent hover:border-border/40'
+                    >
+                      <div className='w-9 h-9 rounded-full bg-background/50 flex items-center justify-center relative overflow-hidden'>
+                        <TokenLogo symbol={sym} size={22} />
+                        {(jup?.icon || ICON_OVERRIDES[sym]) && (
+                          <img
+                            src={(jup?.icon as string) || ICON_OVERRIDES[sym]!}
+                            alt={sym}
+                            className='absolute inset-0 w-full h-full rounded-full object-cover'
+                            data-fallback={ICON_FALLBACK_2[sym] || ''}
+                            onError={(e) => {
+                              const img = e.currentTarget as HTMLImageElement;
+                              const next = img.getAttribute('data-fallback');
+                              if (next) {
+                                img.setAttribute('data-fallback', '');
+                                img.src = next;
+                              } else {
+                                img.style.display = 'none';
+                              }
+                            }}
+                          />
+                        )}
+                      </div>
+                      <div className='flex-1 text-left'>
+                        <div className='font-medium text-sm'>{sym}</div>
+                        <div className='text-[10px] text-muted-foreground'>
+                          {jup?.name || 'Token'}
+                        </div>
+                      </div>
+                      <ChevronDown className='h-4 w-4 text-muted-foreground rotate-[-90deg]' />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+             
           </Card>
         </div>
       )}
 
-      {/* Token Selection Modal */}
+      {/* Token Selection Modal - IMPROVED */}
       {showTokenSelect && (
         <div
-          className='fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center'
+          className='fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center transition-all duration-300 ease-out'
+          style={{ animation: 'fadeIn 0.2s ease-out' }}
           onClick={() => setShowTokenSelect(false)}
         >
           <Card
-            className='w-80 overflow-hidden'
+            className='w-full max-w-md mx-4 sm:mx-0 overflow-hidden shadow-2xl border-border/60'
+            style={{ animation: 'slideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className='p-3 border-b'>
-              <h3 className='font-semibold text-sm'>{t('onRamp.selectToken')}</h3>
+            {/* Header with close button */}
+            <div className='flex items-center justify-between p-4 border-b border-border/60 bg-card/50 backdrop-blur-sm'>
+              <h3 className='font-semibold text-base'>{t('onRamp.selectToken')}</h3>
+              <button 
+                onClick={() => setShowTokenSelect(false)}
+                className='p-1 rounded-lg hover:bg-muted/50 transition-all duration-200'
+              >
+                <X className='h-4 w-4 text-muted-foreground' />
+              </button>
             </div>
-            <div className='p-2'>
-              {(['USDC', 'USDT'] as TokenSym[]).map((token) => {
+
+            {/* Token Options */}
+            <div className='p-3 space-y-1.5'>
+              {(['USDC', 'USDT'] as TokenSym[]).map((token, index) => {
                 const jupiterToken = tokenData?.get(token);
                 return (
                   <button
@@ -415,34 +570,48 @@ export const OnRampForm = ({ onPreview, tokenData }: OnRampFormProps) => {
                       setToToken(token);
                       setShowTokenSelect(false);
                     }}
-                    className={`w-full flex items-center gap-2.5 p-2.5 rounded-lg transition-colors ${
+                    style={{ animationDelay: `${index * 50}ms` }}
+                    className={`w-full flex items-center gap-3 p-3.5 rounded-xl transition-all duration-200 hover:scale-[1.02] ${
                       token === toToken
-                        ? 'bg-primary/10 border border-primary/30'
-                        : 'hover:bg-muted/50'
+                        ? 'bg-primary/15 border-2 border-primary/40 shadow-sm'
+                        : 'bg-muted/30 hover:bg-muted/50 border-2 border-transparent'
                     }`}
                   >
-                    <div className='flex items-center'>
-                      {jupiterToken?.icon ? (
-                        <img
-                          src={jupiterToken.icon}
-                          alt={token}
-                          className='w-6 h-6 rounded-full'
-                        />
-                      ) : (
-                        <span className='text-xl text-secondary'>
-                          {fallbackTokenIcons[token]}
-                        </span>
-                      )}
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center overflow-hidden relative ${
+                      token === toToken ? 'bg-primary/20 ring-2 ring-primary/30' : 'bg-background/50'
+                    }`}>
+                      <TokenLogo symbol={token} size={24} />
+                      <img
+                        src={(jupiterToken?.icon as string) || ICON_OVERRIDES[token] || ''}
+                        alt={token}
+                        className='absolute inset-0 w-full h-full object-cover'
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
                     </div>
                     <div className='flex-1 text-left'>
-                      <div className='font-medium text-sm'>{token}</div>
-                      {jupiterToken?.id && (
-                        <div className='text-[10px] text-muted-foreground truncate'>
-                          {jupiterToken.id.slice(0, 4)}...
-                          {jupiterToken.id.slice(-4)}
+                      <div className='font-semibold text-sm'>{token}</div>
+                      {/* Always show short address using known devnet mint as fallback */}
+                      {(
+                        jupiterToken?.id ||
+                        (TOKEN_ADDRESSES as Record<string, string>)[token]
+                      ) && (
+                        <div className='text-[10px] text-muted-foreground font-mono'>
+                          {(
+                            (jupiterToken?.id || (TOKEN_ADDRESSES as Record<string, string>)[token]) as string
+                          ).slice(0, 4)}...
+                          {(
+                            (jupiterToken?.id || (TOKEN_ADDRESSES as Record<string, string>)[token]) as string
+                          ).slice(-4)}
                         </div>
                       )}
                     </div>
+                    {token === toToken && (
+                      <div className='w-5 h-5 rounded-full bg-primary flex items-center justify-center'>
+                        <div className='w-2 h-2 rounded-full bg-primary-foreground' />
+                      </div>
+                    )}
                   </button>
                 );
               })}
@@ -456,18 +625,53 @@ export const OnRampForm = ({ onPreview, tokenData }: OnRampFormProps) => {
         onOpenChange={setPreviewOpen}
         data={{ fromCurrency, toToken, amount: amountUsd, paymentMethod }}
         onConfirm={async () => {
-          const orderId = generateOrderId();
-          console.log('checkout_success', orderId);
-          const url = `/callback/success?orderId=${encodeURIComponent(
-            orderId
-          )}&amount=${encodeURIComponent(
-            amountUsd.toFixed(2)
-          )}&token=${encodeURIComponent(toToken)}&currency=${encodeURIComponent(
-            fromCurrency
-          )}`;
-          // Simulate 600ms redirect delay
-          await new Promise((r) => setTimeout(r, 600));
-          router.push(url);
+          try {
+            setIsCreatingOrder(true);
+            // Ensure SDK script is present (if needed later)
+            if (typeof window !== 'undefined' && !document.querySelector(`script[src="${Payment_js_src}"]`)) {
+              const s = document.createElement('script');
+              s.src = Payment_js_src;
+              s.async = true;
+              document.body.appendChild(s);
+            }
+
+            // Build fee and total consistent with preview modal
+            const subtotal = Number(amountUsd.toFixed(2));
+            const fee = Math.max(0.3, subtotal * 0.029);
+            const feeRounded = Number(fee.toFixed(2));
+            const network = 0.01;
+            const networkRounded = Number(network.toFixed(2));
+            const total = Number((subtotal + feeRounded + networkRounded).toFixed(2));
+
+            const res = await createWhateeOrder({
+              amount: total,
+              currency: fromCurrency,
+              description: `Buy ${toToken} via Lazorkit`,
+              metadata: { toToken, subtotal: String(subtotal), fee: String(feeRounded), network: String(networkRounded) },
+              token: toToken,
+              orderLines: [
+                { key: 'subtotal', title: 'Subtotal', quantity: 1, unit_price: subtotal, amount: subtotal },
+                { key: 'fee', title: 'Fee', quantity: 1, unit_price: feeRounded, amount: feeRounded },
+                { key: 'network', title: 'Est. network fee', quantity: 1, unit_price: networkRounded, amount: networkRounded },
+              ],
+            });
+
+            // Always redirect to provider checkout page
+            if (res.checkoutUrl) {
+              window.location.href = res.checkoutUrl;
+            } else {
+              // If provider does not return a checkout url, treat as error
+              throw new Error('Missing checkoutUrl from provider');
+            }
+          } catch (e) {
+            // On error, redirect to failed callback with reason
+            const url = `/callback/failed?reason=${encodeURIComponent((e as Error).message)}&amount=${encodeURIComponent(
+              amountUsd.toFixed(2)
+            )}&token=${encodeURIComponent(toToken)}&currency=${encodeURIComponent(fromCurrency)}`;
+            router.push(url);
+          } finally {
+            setIsCreatingOrder(false);
+          }
         }}
       />
     </>

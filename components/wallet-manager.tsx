@@ -53,8 +53,8 @@ export const WalletManager = () => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
       toast({
-        title: "Address copied",
-        description: "Wallet address copied to clipboard",
+        title: t('notifications.addressCopied'),
+        description: t('notifications.addressCopiedDesc'),
       });
     }
   };
@@ -67,14 +67,14 @@ export const WalletManager = () => {
       
       generateNewWallet();
       toast({
-        title: t('settings.walletManager.newWalletGenerated'),
-        description: t('settings.walletManager.newWalletGeneratedDesc'),
+        title: t('notifications.walletGenerated'),
+        description: t('notifications.walletGeneratedDesc'),
       });
     } catch (error) {
       console.error('Generate wallet error:', error);
       toast({
-        title: t('settings.walletManager.refreshFailed'),
-        description: 'Failed to generate new wallet',
+        title: t('notifications.walletGeneratedFailed'),
+        description: t('notifications.walletGeneratedFailedDesc'),
         variant: 'destructive',
       });
     }
@@ -116,8 +116,8 @@ export const WalletManager = () => {
           new PublicKey(newAddress.trim());
         } catch {
           toast({
-            title: t('settings.walletManager.refreshFailed'),
-            description: 'Invalid Solana address',
+            title: t('notifications.invalidAddress'),
+            description: t('notifications.invalidAddressDesc'),
             variant: 'destructive',
           });
           return;
@@ -136,8 +136,8 @@ export const WalletManager = () => {
     } catch (error) {
       console.error('Set address error:', error);
       toast({
-        title: t('settings.walletManager.refreshFailed'),
-        description: 'Failed to set custom address',
+        title: t('notifications.addressSetFailed'),
+        description: t('notifications.addressSetFailedDesc'),
         variant: 'destructive',
       });
     }

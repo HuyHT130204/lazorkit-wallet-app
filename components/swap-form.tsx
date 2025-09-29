@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ArrowUpDown, Settings2, ChevronDown, Sparkles, RefreshCcw } from 'lucide-react';
+import { ArrowUpDown, Settings2, ChevronDown, Sparkles, RefreshCcw, Search, X } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
+import { Card } from './ui/card';
 import { TokenLogo } from './ui/token-logo';
 import { useWalletStore, TokenSym } from '@/lib/store/wallet';
 import { formatTokenAmount, formatCurrency } from '@/lib/utils/format';
@@ -17,6 +17,9 @@ interface SwapFormProps {
   onPreview?: (data: SwapData) => void;
   tokenData?: Map<string, JupiterToken>;
   className?: string;
+  initialFromToken?: TokenSym;
+  initialToToken?: TokenSym;
+  onSwitchToBuy?: (params: { fiat: 'USD' | 'VND' }) => void;
 }
 
 interface SwapData {
@@ -53,20 +56,31 @@ const fallbackTokenIcons: Record<string, string> = {
 export const SwapForm = ({
   onPreview,
   tokenData,
+  initialFromToken,
+  initialToToken,
+  onSwitchToBuy,
 }: SwapFormProps) => {
   const { tokens, swapReal } = useWalletStore();
-  const [fromToken, setFromToken] = useState<TokenSym>('USDC');
-  const [toToken, setToToken] = useState<TokenSym>('SOL');
+  const [fromToken, setFromToken] = useState<TokenSym>(initialFromToken || 'USDC');
+  const [toToken, setToToken] = useState<TokenSym>(initialToToken || 'SOL');
   const [amount, setAmount] = useState('');
   const [slippage, setSlippage] = useState(1);
   const [error, setError] = useState('');
   const [reviewOpen, setReviewOpen] = useState(false);
-  const [showTokenSelect, setShowTokenSelect] = useState<'from' | 'to' | null>(
-    null
-  );
+  const [showTokenSelect, setShowTokenSelect] = useState<'from' | 'to' | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const [quote, setQuote] = useState<SwapData['quote'] | undefined>(undefined);
   const [loadingQuote, setLoadingQuote] = useState(false);
   const [useRealSwap, setUseRealSwap] = useState(false);
+
+  // Sync with provided initial tokens if props change
+  useEffect(() => {
+    if (initialFromToken) setFromToken(initialFromToken);
+  }, [initialFromToken]);
+
+  useEffect(() => {
+    if (initialToToken) setToToken(initialToToken);
+  }, [initialToToken]);
 
   const fromTokenData = tokens.find((t) => t.symbol === fromToken);
   const toTokenData = tokens.find((t) => t.symbol === toToken);
@@ -126,27 +140,29 @@ export const SwapForm = ({
   }, [amountNum, fromToken, toToken, slippage]);
 
   // Get token icon from Jupiter data or use fallback
-  const getTokenIcon = (symbol: string) => {
+  const getTokenIcon = (symbol: string, size: number = 20) => {
     const token = tokenData?.get(symbol);
-    if (token?.icon) {
+    const overrides: Record<string, string> = {
+      USDC: 'https://cryptologos.cc/logos/usd-coin-usdc-logo.svg?v=026',
+      USDT: 'https://cryptologos.cc/logos/tether-usdt-logo.svg?v=026',
+      SOL: 'https://cryptologos.cc/logos/solana-sol-logo.svg?v=026',
+    };
+    const px = size;
       return (
-        <>
+      <div className='relative' style={{ width: px, height: px }}>
+        <TokenLogo symbol={symbol} size={size} />
+        {(token?.icon || overrides[symbol]) && (
           <img
-            src={token.icon}
+            src={(token?.icon as string) || overrides[symbol]}
             alt={symbol}
-            className='w-5 h-5 rounded-full'
+            className='absolute inset-0 w-full h-full rounded-full object-cover'
             onError={(e) => {
-              // Fallback to text icon if image fails to load
               e.currentTarget.style.display = 'none';
-              const nextElement = e.currentTarget.nextSibling as HTMLElement;
-              nextElement?.classList.remove('hidden');
             }}
           />
-          <TokenLogo symbol={symbol} size={20} />
-        </>
+        )}
+      </div>
       );
-    }
-    return <TokenLogo symbol={symbol} size={20} />;
   };
 
   // Get price from Jupiter data or fallback to local data
@@ -180,7 +196,7 @@ export const SwapForm = ({
 
   const validateForm = () => {
     if (!amount || amountNum <= 0) {
-      setError('Please enter a valid amount');
+      setError(t('notifications.enterValidAmount'));
       return false;
     }
 
@@ -261,6 +277,13 @@ export const SwapForm = ({
 
   // Get available tokens that we have data for
   const availableTokens = ['SOL', 'USDC', 'USDT', 'BONK', 'RAY', 'JUP', 'ORCA', 'mSOL', 'JitoSOL', 'PYTH'] as TokenSym[];
+  const fiatOptions: Array<'USD' | 'VND'> = ['USD', 'VND'];
+
+  // Filter tokens based on search
+  const filteredTokens = availableTokens.filter(token => 
+    token.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (tokenData?.get(token)?.name || '').toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <>
@@ -281,7 +304,7 @@ export const SwapForm = ({
                   : 'bg-muted/20 text-muted-foreground border border-border/30'
               }`}
             >
-              {useRealSwap ? 'Real Swap' : 'Demo Swap'}
+              {useRealSwap ? t('notifications.realSwap') : t('notifications.demoSwap')}
             </button>
             <button className='p-1.5 rounded-lg hover:bg-muted/50 transition-colors'>
               <Settings2 className='h-3.5 w-3.5 text-muted-foreground' />
@@ -433,10 +456,10 @@ export const SwapForm = ({
         {/* Action Button */}
         <Button
           onClick={handlePreview}
-          className={`w-full py-2.5 rounded-lg font-semibold text-sm transition-all duration-300 ${
+          className={`w-full py-2.5 rounded-lg font-semibold text-sm transition-all duration-300 button-press ${
             !amount || !!error || amountNum <= 0
               ? 'bg-muted text-muted-foreground cursor-not-allowed'
-              : 'bg-primary hover:bg-primary/90 hover:scale-[1.02] active:scale-[0.98]'
+              : 'bg-primary hover:bg-primary/90 hover:scale-[1.02] active:scale-[0.98] pulse-important'
           }`}
           disabled={!amount || !!error || amountNum <= 0}
         >
@@ -477,17 +500,115 @@ export const SwapForm = ({
         </div>
       </div>
 
-      {/* Token Selection Modal */}
+      {/* Enhanced Token Selection Modal */}
       {showTokenSelect && (
-        <Dialog open={!!showTokenSelect} onOpenChange={() => setShowTokenSelect(null)}>
-          <DialogContent className='sm:max-w-md max-h-[80vh] overflow-hidden'>
-            <DialogHeader>
-              <DialogTitle>{t('swap.selectToken')}</DialogTitle>
-            </DialogHeader>
-            <div className='overflow-y-auto max-h-[60vh] p-2'>
-              {availableTokens.map((tokenSymbol) => {
+        <div
+          className='fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center transition-all duration-300 ease-out'
+          style={{ animation: 'fadeIn 0.2s ease-out' }}
+          onClick={() => {
+            setShowTokenSelect(null);
+            setSearchTerm('');
+          }}
+        >
+          <style jsx>{`
+            @keyframes fadeIn {
+              from { opacity: 0; }
+              to { opacity: 1; }
+            }
+            @keyframes slideUp {
+              from { 
+                opacity: 0;
+                transform: translateY(20px) scale(0.95);
+              }
+              to { 
+                opacity: 1;
+                transform: translateY(0) scale(1);
+              }
+            }
+            .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+            .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+            .custom-scrollbar::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / 0.3); border-radius: 3px; }
+            .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.5); }
+          `}</style>
+          <Card
+            className='w-full max-w-md mx-4 sm:mx-0 overflow-hidden shadow-2xl border-border/60'
+            style={{ animation: 'slideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header with close button */}
+            <div className='flex items-center justify-between p-4 border-b border-border/60 bg-card/50 backdrop-blur-sm'>
+              <h3 className='font-semibold text-base'>{t('swap.selectToken')}</h3>
+              <button 
+                onClick={() => {
+                  setShowTokenSelect(null);
+                  setSearchTerm('');
+                }}
+                className='p-1 rounded-lg hover:bg-muted/50 transition-all duration-200'
+              >
+                <X className='h-4 w-4 text-muted-foreground' />
+              </button>
+            </div>
+
+            {/* Search bar */}
+            <div className='px-4 pt-3 pb-2'>
+              <div className='relative'>
+                <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
+                <input
+                  type='text'
+                  placeholder='Search tokens...'
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className='w-full pl-9 pr-3 py-2 bg-muted/30 border border-border/40 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all duration-200'
+                />
+              </div>
+            </div>
+
+            {/* Fiat options to switch back to Buy (only for 'from' selection) */}
+            {showTokenSelect === 'from' && (
+              <div className='px-4 pb-3'>
+                <div className='space-y-1.5'>
+                  {fiatOptions.map((fiat, index) => (
+                    <button
+                      key={`fiat-${fiat}`}
+                      onClick={() => {
+                        setShowTokenSelect(null);
+                        setSearchTerm('');
+                        onSwitchToBuy?.({ fiat });
+                      }}
+                      style={{ animationDelay: `${index * 50}ms` }}
+                      className='w-full flex items-center justify-between p-3 rounded-xl transition-all duration-200 bg-muted/30 hover:bg-muted/50 hover:scale-[1.01] border border-transparent hover:border-border/40'
+                    >
+                      <div className='flex items-center gap-3'>
+                        <div className='w-10 h-10 rounded-full bg-background/50 flex items-center justify-center text-lg font-semibold'>
+                          {fiat === 'USD' ? '$' : '₫'}
+                        </div>
+                        <div className='text-left'>
+                          <div className='font-medium text-sm'>{fiat}</div>
+                          <div className='text-xs text-muted-foreground'>
+                            {fiat === 'USD' ? 'US Dollar' : 'Vietnamese Dong'}
+                          </div>
+                        </div>
+                      </div>
+                      <ChevronDown className='h-4 w-4 text-muted-foreground rotate-[-90deg]' />
+                    </button>
+                  ))}
+                </div>
+                <div className='border-t border-border/40 mt-3 pt-3'>
+                  <div className='text-xs text-muted-foreground text-center uppercase tracking-wider font-medium'>
+                    Or select token
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Token Options - Scrollable */}
+            <div className='px-4 pb-4 max-h-[350px] overflow-y-auto custom-scrollbar'>
+              <div className='space-y-1.5'>
+                {filteredTokens.map((tokenSymbol, index) => {
                 const token = tokens.find((t) => t.symbol === tokenSymbol);
                 const jupiterToken = tokenData?.get(tokenSymbol);
+                  const isSelected = (showTokenSelect === 'from' && tokenSymbol === fromToken) ||
+                                   (showTokenSelect === 'to' && tokenSymbol === toToken);
 
                 if (!token) return null;
 
@@ -501,52 +622,67 @@ export const SwapForm = ({
                         setToToken(token.symbol);
                       }
                       setShowTokenSelect(null);
-                    }}
-                    className={`w-full flex items-center justify-between p-2.5 rounded-lg transition-colors ${
-                      (showTokenSelect === 'from' &&
-                        token.symbol === fromToken) ||
-                      (showTokenSelect === 'to' && token.symbol === toToken)
-                        ? 'bg-primary/10 border border-primary/30'
-                        : 'hover:bg-muted/50'
-                    }`}
-                  >
-                    <div className='flex items-center gap-2.5'>
-                      <div className='flex items-center'>
+                        setSearchTerm('');
+                      }}
+                      style={{ animationDelay: `${index * 30}ms` }}
+                      className={`w-full flex items-center justify-between p-3 rounded-xl transition-all duration-200 hover:scale-[1.02] ${
+                        isSelected
+                          ? 'bg-primary/15 border-2 border-primary/40 shadow-sm'
+                          : 'bg-muted/30 hover:bg-muted/50 border-2 border-transparent'
+                      }`}
+                    >
+                      <div className='flex items-center gap-3'>
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center overflow-hidden ${
+                          isSelected ? 'bg-primary/20 ring-2 ring-primary/30' : 'bg-background/50'
+                        }`}>
                         {jupiterToken?.icon ? (
                           <img
                             src={jupiterToken.icon}
                             alt={token.symbol}
-                            className='w-6 h-6 rounded-full'
-                          />
-                        ) : (
-                          <span className='text-xl'>
-                            {fallbackTokenIcons[token.symbol]}
-                          </span>
-                        )}
+                              className='w-full h-full object-cover rounded-full'
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                                const next = e.currentTarget.nextSibling as HTMLElement;
+                                if (next) next.classList.remove('hidden');
+                              }}
+                            />
+                          ) : null}
+                          <div className={jupiterToken?.icon ? 'hidden' : ''}>
+                            <TokenLogo symbol={token.symbol} size={24} />
                       </div>
-                      <div className='text-left'>
-                        <div className='font-medium text-sm'>
-                          {token.symbol}
                         </div>
+                        <div className='text-left'>
+                          <div className='font-semibold text-sm'>{token.symbol}</div>
                         <div className='text-xs text-muted-foreground'>
                           {jupiterToken?.name || `${token.symbol} Token`}
                         </div>
                       </div>
                     </div>
                     <div className='text-right'>
-                      <div className='text-xs'>
-                        {formatTokenAmount(token.amount, token.symbol)}
+                        <div className='text-sm font-medium'>
+                          {token.amount.toFixed(4)} {token.symbol}
                       </div>
                       <div className='text-xs text-muted-foreground'>
                         {formatCurrency(token.amount * token.priceUsd, 'USD')}
                       </div>
+                        <div className='text-xs font-medium text-primary'>
+                          {formatCurrency(jupiterToken?.usdPrice || token.priceUsd, 'USD')}
+                        </div>
                     </div>
+                      {/* Selected border only - no dot */}
                   </button>
                 );
               })}
+                {filteredTokens.length === 0 && (
+                  <div className='text-center py-8 text-muted-foreground'>
+                    <div className='text-sm'>No tokens found</div>
+                    <div className='text-xs mt-1'>Try a different search term</div>
+                  </div>
+                )}
+              </div>
             </div>
-          </DialogContent>
-        </Dialog>
+          </Card>
+        </div>
       )}
 
       <SwapReviewModal
@@ -563,22 +699,22 @@ export const SwapForm = ({
             const success = await swapReal(fromToken, toToken, amountNum);
             if (success) {
               toast({
-                title: 'Real Swap confirmed',
+                title: t('notifications.realSwapConfirmed'),
                 description: `${amountNum} ${fromToken} -> ${estimatedReceive.toFixed(
                   4
                 )} ${toToken}`,
               });
             } else {
               toast({
-                title: 'Swap failed',
-                description: 'Failed to execute swap transaction',
+                title: t('notifications.realSwapFailed'),
+                description: t('notifications.realSwapFailedDesc'),
                 variant: 'destructive',
               });
             }
           } else {
             useWalletStore.getState().swapFake(fromToken, toToken, amountNum);
             toast({
-              title: 'Demo Swap confirmed',
+              title: t('notifications.demoSwapConfirmed'),
               description: `${amountNum} ${fromToken} -> ${estimatedReceive.toFixed(
                 4
               )} ${toToken}`,

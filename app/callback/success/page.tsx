@@ -17,10 +17,11 @@ export default function SuccessCallbackPage() {
   const { hasWallet, setHasWallet, setPubkey, onrampFake } = useWalletStore();
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const orderId = searchParams.get('orderId');
-  const amount = parseFloat(searchParams.get('amount') || '0');
-  const token = searchParams.get('token') as 'SOL' | 'USDC' | 'USDT' | null;
-  const currency = searchParams.get('currency') as 'USD' | 'VND' | null;
+  const orderId = searchParams.get('orderId') || searchParams.get('id') || searchParams.get('order_id') || searchParams.get('ref');
+  const amount = parseFloat(searchParams.get('amount') || searchParams.get('total') || '0');
+  const token = (searchParams.get('token') as 'SOL' | 'USDC' | 'USDT' | null) || null;
+  const currency = (searchParams.get('currency') as 'USD' | 'VND' | null) || (searchParams.get('currency_code') as 'USD' | 'VND' | null);
+  const status = searchParams.get('status');
 
   useEffect(() => {
     if (orderId && amount && token && currency) {

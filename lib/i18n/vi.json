@@ -310,5 +310,26 @@
     "insufficientFunds": "Không đủ tiền",
     "invalidInput": "Thông tin nhập vào không hợp lệ",
     "operationFailed": "Thao tác thất bại"
+  },
+  "notifications": {
+    "addressCopied": "Đã sao chép địa chỉ",
+    "addressCopiedDesc": "Địa chỉ ví đã được sao chép vào clipboard",
+    "walletGenerated": "Đã tạo ví mới",
+    "walletGeneratedDesc": "Một địa chỉ ví mới đã được tạo",
+    "walletGeneratedFailed": "Tạo ví thất bại",
+    "walletGeneratedFailedDesc": "Không thể tạo ví mới",
+    "invalidAddress": "Địa chỉ không hợp lệ",
+    "invalidAddressDesc": "Địa chỉ Solana không hợp lệ",
+    "addressSetFailed": "Đặt địa chỉ thất bại",
+    "addressSetFailedDesc": "Không thể đặt địa chỉ tùy chỉnh",
+    "enterValidAmount": "Vui lòng nhập số tiền hợp lệ",
+    "realSwap": "Hoán đổi thực",
+    "demoSwap": "Hoán đổi demo",
+    "realSwapConfirmed": "Hoán đổi thực đã xác nhận",
+    "realSwapFailed": "Hoán đổi thất bại",
+    "realSwapFailedDesc": "Không thể thực hiện giao dịch hoán đổi",
+    "demoSwapConfirmed": "Hoán đổi demo đã xác nhận",
+    "noPubkeySharing": "Không có khóa công khai để chia sẻ",
+    "noPubkeyCopying": "Không có khóa công khai để sao chép"
   }
 }

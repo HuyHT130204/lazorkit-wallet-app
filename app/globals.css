@@ -99,8 +99,6 @@
   }
   body {
     @apply bg-background text-foreground;
-    /* Added glassmorphism backdrop support */
-    backdrop-filter: blur(20px);
   }
 
   /* Clean glassmorphism utility classes - no gradients */
@@ -276,6 +274,148 @@
 
   .app-card-hover:hover .app-content {
     @apply translate-x-1;
+  }
+
+  /* Smooth micro-interactions */
+  .smooth-hover {
+    @apply transition-all duration-300 ease-out;
+  }
+
+  .smooth-hover:hover {
+    @apply scale-105 shadow-lg;
+  }
+
+  .smooth-hover:active {
+    @apply scale-95;
+  }
+
+  /* Button press animation */
+  .button-press {
+    @apply transition-all duration-150 ease-out;
+  }
+
+  .button-press:active {
+    @apply scale-95;
+  }
+
+  /* Card entrance animation */
+  .card-entrance {
+    animation: cardEntrance 0.6s ease-out;
+  }
+
+  @keyframes cardEntrance {
+    from {
+      opacity: 0;
+      transform: translateY(20px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  /* Stagger animation for lists */
+  .stagger-item {
+    animation: staggerItem 0.5s ease-out forwards;
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  .stagger-item:nth-child(1) { animation-delay: 0.1s; }
+  .stagger-item:nth-child(2) { animation-delay: 0.2s; }
+  .stagger-item:nth-child(3) { animation-delay: 0.3s; }
+  .stagger-item:nth-child(4) { animation-delay: 0.4s; }
+  .stagger-item:nth-child(5) { animation-delay: 0.5s; }
+
+  @keyframes staggerItem {
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Smooth loading animation */
+  .smooth-loading {
+    animation: smoothLoading 1.5s ease-in-out infinite;
+  }
+
+  @keyframes smoothLoading {
+    0%, 100% {
+      opacity: 0.6;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.05);
+    }
+  }
+
+  /* Bounce animation for success states */
+  .bounce-success {
+    animation: bounceSuccess 0.6s ease-out;
+  }
+
+  @keyframes bounceSuccess {
+    0% {
+      transform: scale(0.3);
+      opacity: 0;
+    }
+    50% {
+      transform: scale(1.05);
+    }
+    70% {
+      transform: scale(0.9);
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  /* Slide in from right */
+  .slide-in-right {
+    animation: slideInRight 0.4s ease-out;
+  }
+
+  @keyframes slideInRight {
+    from {
+      opacity: 0;
+      transform: translateX(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  /* Slide in from left */
+  .slide-in-left {
+    animation: slideInLeft 0.4s ease-out;
+  }
+
+  @keyframes slideInLeft {
+    from {
+      opacity: 0;
+      transform: translateX(-30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  /* Pulse animation for important elements */
+  .pulse-important {
+    animation: pulseImportant 2s ease-in-out infinite;
+  }
+
+  @keyframes pulseImportant {
+    0%, 100% {
+      box-shadow: 0 0 0 0 rgba(120, 87, 255, 0.4);
+    }
+    50% {
+      box-shadow: 0 0 0 10px rgba(120, 87, 255, 0);
+    }
   }
 
   /* Glow effect for verified apps */

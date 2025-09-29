@@ -125,12 +125,12 @@ export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps
       open={open}
       onOpenChange={onOpenChange}
       title={t('send.title')}
-      className="max-w-lg"
+      className="max-w-md"
     >
-      <div className="p-6 space-y-6">
+      <div className="p-4 space-y-4">
         {/* Token Selection */}
-        <div className="space-y-3">
-          <Label className="text-base font-medium flex items-center gap-2">
+        <div className="space-y-2">
+          <Label className="text-sm font-medium flex items-center gap-2">
             <Wallet className="h-4 w-4" />
             {t('send.selectToken')}
           </Label>
@@ -139,11 +139,12 @@ export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps
             onValueChange={(value: TokenSym) => setSelectedToken(value)}
             options={tokenOptions}
             placeholder={t('send.selectToken')}
+            className="h-10"
           />
           {selectedTokenData && (
-            <div className="p-3 bg-muted/30 rounded-lg">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">
+            <div className="p-2 bg-muted/30 rounded-lg">
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground">
                   {t('send.availableBalance')}
                 </span>
                 <span className="font-medium">
@@ -155,8 +156,8 @@ export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps
         </div>
 
         {/* Recipient Address */}
-        <div className="space-y-3">
-          <Label className="text-base font-medium">
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">
             {t('send.recipient')}
           </Label>
           <div className="space-y-2">
@@ -168,17 +169,17 @@ export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps
                   setRecipient(e.target.value);
                   setError('');
                 }}
-                className={`flex-1 ${error ? 'border-destructive' : ''}`}
+                className={`flex-1 h-10 ${error ? 'border-destructive' : ''}`}
               />
-              <Button variant="outline" size="sm" onClick={handlePaste} title={t('send.paste')}>
+              <Button variant="outline" size="sm" onClick={handlePaste} title={t('send.paste')} className="h-10 w-10 p-0">
                 <Clipboard className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="sm" disabled title={t('send.scanQR')}>
+              <Button variant="outline" size="sm" disabled title={t('send.scanQR')} className="h-10 w-10 p-0">
                 <QrCode className="h-4 w-4" />
               </Button>
             </div>
             {error && (
-              <p className="text-sm text-destructive flex items-center gap-1">
+              <p className="text-xs text-destructive flex items-center gap-1">
                 <span className="w-1 h-1 bg-destructive rounded-full"></span>
                 {error}
               </p>
@@ -187,8 +188,8 @@ export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps
         </div>
 
         {/* Amount */}
-        <div className="space-y-3">
-          <Label className="text-base font-medium">
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">
             {t('send.enterAmount')}
           </Label>
           <div className="flex gap-2">
@@ -200,31 +201,31 @@ export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps
                 setAmount(e.target.value);
                 setError('');
               }}
-              className={`flex-1 ${error ? 'border-destructive' : ''}`}
+              className={`flex-1 h-10 ${error ? 'border-destructive' : ''}`}
             />
-            <Button variant="outline" onClick={handleMaxClick}>
+            <Button variant="outline" onClick={handleMaxClick} className="h-10 px-3">
               {t('common.max')}
             </Button>
           </div>
         </div>
 
         {/* Transaction Details */}
-        <div className="space-y-3">
-          <h4 className="text-sm font-medium text-muted-foreground">
+        <div className="space-y-2">
+          <h4 className="text-xs font-medium text-muted-foreground">
             {t('send.transactionDetails')}
           </h4>
-          <div className="space-y-2">
-            <div className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
-              <span className="text-sm text-muted-foreground">
+          <div className="space-y-1">
+            <div className="flex justify-between items-center p-2 bg-muted/30 rounded-lg">
+              <span className="text-xs text-muted-foreground">
                 {t('send.estimatedFee')}
               </span>
-              <span className="text-sm font-medium">0.000005 SOL</span>
+              <span className="text-xs font-medium">0.000005 SOL</span>
             </div>
-            <div className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
-              <span className="text-sm text-muted-foreground">
+            <div className="flex justify-between items-center p-2 bg-muted/30 rounded-lg">
+              <span className="text-xs text-muted-foreground">
                 {t('send.totalAmount')}
               </span>
-              <span className="text-sm font-medium">
+              <span className="text-xs font-medium">
                 {amountNum > 0 ? `${amountNum} ${selectedToken}` : '-'}
               </span>
             </div>
@@ -232,28 +233,28 @@ export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps
         </div>
 
         {/* Actions */}
-        <div className="flex gap-3 pt-4 border-t">
+        <div className="flex gap-2 pt-3 border-t">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
-            className="flex-1 h-12"
+            className="flex-1 h-10"
           >
             {t('common.cancel')}
           </Button>
           <Button
             onClick={handleSend}
-            className="flex-1 h-12"
+            className="flex-1 h-10"
             disabled={isProcessing || !!error}
           >
             {isProcessing ? (
               <div className="flex items-center gap-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                <span>{t('send.sending')}</span>
+                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                <span className="text-sm">{t('send.sending')}</span>
               </div>
             ) : (
               <div className="flex items-center gap-2">
-                <span>{t('send.confirm')}</span>
-                <ArrowRight className="h-4 w-4" />
+                <span className="text-sm">{t('send.confirm')}</span>
+                <ArrowRight className="h-3 w-3" />
               </div>
             )}
           </Button>

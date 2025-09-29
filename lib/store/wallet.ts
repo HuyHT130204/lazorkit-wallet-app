@@ -20,6 +20,7 @@ import {
   defaultConnection,
   TOKEN_ADDRESSES
 } from '@/lib/services/jupiter';
+import { fetchRealTokenData } from '@/lib/services/real-token-service';
 import { Connection } from '@solana/web3.js';
 
 // Re-export types for backward compatibility
@@ -351,28 +352,36 @@ export const useWalletStore = create<WalletState>()(
               return;
             }
 
-            const balances = await getAllTokenBalances(state.pubkey, defaultConnection);
+            // Use real token data service
+            const realTokens = await fetchRealTokenData(state.pubkey, defaultConnection);
             
-            if (!balances || typeof balances !== 'object') {
-              console.warn('Invalid balances response:', balances);
-              return;
-            }
-
-            const newTokens = state.tokens.map(token => {
-              try {
-                const mint = TOKEN_ADDRESSES[token.symbol as keyof typeof TOKEN_ADDRESSES];
-                if (mint && balances.has(mint)) {
-                  const balance = balances.get(mint);
-                  return { ...token, amount: typeof balance === 'number' ? balance : 0 };
-                }
-                return token;
-              } catch (error) {
-                console.warn('Error processing token:', token.symbol, error);
-                return token;
+            if (realTokens && realTokens.length > 0) {
+              set({ tokens: realTokens });
+            } else {
+              // Fallback to old method if real service fails
+              const balances = await getAllTokenBalances(state.pubkey, defaultConnection);
+              
+              if (!balances || typeof balances !== 'object') {
+                console.warn('Invalid balances response:', balances);
+                return;
               }
-            });
-            
-            set({ tokens: newTokens });
+
+              const newTokens = state.tokens.map(token => {
+                try {
+                  const mint = TOKEN_ADDRESSES[token.symbol as keyof typeof TOKEN_ADDRESSES];
+                  if (mint && balances.has(mint)) {
+                    const balance = balances.get(mint);
+                    return { ...token, amount: typeof balance === 'number' ? balance : 0 };
+                  }
+                  return token;
+                } catch (error) {
+                  console.warn('Error processing token:', token.symbol, error);
+                  return token;
+                }
+              });
+              
+              set({ tokens: newTokens });
+            }
           } catch (error) {
             console.error('Error refreshing balances:', error);
             // Don't throw error, just log it

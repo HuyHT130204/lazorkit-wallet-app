@@ -4,13 +4,13 @@ import { useState, useEffect } from 'react';
 import { AppHeader } from '@/components/app-header';
 import { DrawerNav } from '@/components/drawer-nav';
 import { WalletBanner } from '@/components/wallet-banner';
-import { OnRampForm } from '@/components/onramp-form';
-import { SwapForm } from '@/components/swap-form';
+import { UnifiedTradeForm } from '@/components/UnifiedTradeForm';
 import { DepositModal } from '@/components/deposit-modal';
 import ErrorBoundary from '@/components/error-boundary';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { fetchCommonTokens, JupiterToken } from '@/lib/services/jupiter';
+import { fetchRealTokenData } from '@/lib/services/real-token-service';
 import { useWalletStore } from '@/lib/store/wallet';
 import { Zap, Shield, Clock, Globe, Star, TrendingUp } from 'lucide-react';
 import { t } from '@/lib/i18n';
@@ -23,9 +23,9 @@ export default function BuyPage() {
     new Map()
   );
   const [loading, setLoading] = useState(true);
-  const { hasWallet } = useWalletStore();
+  const { hasWallet, pubkey, refreshBalances } = useWalletStore();
 
-  // Fetch token data on mount
+  // Fetch token data on mount and when pubkey changes
   useEffect(() => {
     const loadTokenData = async () => {
       try {
@@ -33,6 +33,11 @@ export default function BuyPage() {
         const tokens = await fetchCommonTokens();
         console.log('Loaded token data:', tokens);
         setTokenData(tokens);
+        
+        // Refresh real balances if we have a pubkey
+        if (pubkey && refreshBalances) {
+          await refreshBalances();
+        }
       } catch (error) {
         console.error('Failed to load token data:', error);
       } finally {
@@ -41,7 +46,7 @@ export default function BuyPage() {
     };
 
     loadTokenData();
-  }, []);
+  }, [pubkey, refreshBalances]);
 
   return (
     <div className='min-h-screen bg-background'>
@@ -100,32 +105,6 @@ export default function BuyPage() {
 
           {/* Jupiter-style Card Container */}
           <Card className='swap-buy-glow overflow-hidden'>
-            {/* Swap/Buy Tabs - Only show for users with wallet */}
-            {hasWallet && (
-              <div className='flex bg-muted/5'>
-                <button
-                  onClick={() => setActiveTab('buy')}
-                  className={`flex-1 py-2 text-sm font-semibold transition-all relative ${
-                    activeTab === 'buy'
-                      ? 'text-foreground bg-card border-b-2 border-primary'
-                      : 'text-muted-foreground/60 hover:text-muted-foreground'
-                  }`}
-                >
-                  Buy
-                </button>
-                <button
-                  onClick={() => setActiveTab('swap')}
-                  className={`flex-1 py-2 text-sm font-semibold transition-all relative ${
-                    activeTab === 'swap'
-                      ? 'text-foreground bg-card border-b-2 border-primary'
-                      : 'text-muted-foreground/60 hover:text-muted-foreground'
-                  }`}
-                >
-                  Swap
-                </button>
-              </div>
-            )}
-
             {/* Content */}
             <div className='bg-card'>
               {loading ? (
@@ -134,23 +113,8 @@ export default function BuyPage() {
                     <div key={i} className='h-10 rounded bg-muted/30 animate-pulse' />
                   ))}
                 </div>
-              ) : hasWallet ? (
-                <>
-                  {activeTab === 'buy' && (
-                    <ErrorBoundary>
-                      <OnRampForm tokenData={tokenData} />
-                    </ErrorBoundary>
-                  )}
-                  {activeTab === 'swap' && (
-                    <ErrorBoundary>
-                      <SwapForm tokenData={tokenData} />
-                    </ErrorBoundary>
-                  )}
-                </>
               ) : (
-                <ErrorBoundary>
-                  <OnRampForm tokenData={tokenData} />
-                </ErrorBoundary>
+                <UnifiedTradeForm tokenData={tokenData} />
               )}
             </div>
           </Card>

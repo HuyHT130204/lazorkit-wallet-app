@@ -42,12 +42,12 @@ export default function AccountPage() {
 
         <DrawerNav open={drawerOpen} onOpenChange={setDrawerOpen} />
 
-        <main className='container mx-auto px-4 py-6 max-w-md'>
+        <main className='container mx-auto px-4 py-6 max-w-md pb-24'>
           <div className='space-y-6'>
             {/* Premium Wallet Card */}
             <div className="relative w-full max-w-lg mx-auto">
               <div 
-                className="relative rounded-2xl shadow-2xl overflow-hidden transform transition-all duration-500 hover:scale-[1.01] hover:shadow-[0_25px_70px_rgba(0,0,0,0.9)] aspect-[1.586/1]"
+                className="relative rounded-2xl shadow-2xl overflow-hidden transform transition-all duration-500 hover:scale-[1.01] hover:shadow-[0_25px_70px_rgba(0,0,0,0.9)] aspect-[1.586/1] card-entrance"
                 style={{
                   backgroundImage: 'url(/card_wallet.png)',
                   backgroundSize: 'cover',
@@ -149,7 +149,7 @@ export default function AccountPage() {
               <Button
                 variant='outline'
                 size='sm'
-                className='h-10 hover:bg-primary/10 hover:border-primary/50 transition-all duration-200'
+                className='h-10 hover:bg-primary/10 hover:border-primary/50 transition-all duration-200 smooth-hover button-press slide-in-left'
                 onClick={() => setSendModalOpen(true)}
               >
                 <Send className='mr-2 h-4 w-4' />
@@ -158,7 +158,7 @@ export default function AccountPage() {
               <Button
                 variant='outline'
                 size='sm'
-                className='h-10 hover:bg-primary/10 hover:border-primary/50 transition-all duration-200'
+                className='h-10 hover:bg-primary/10 hover:border-primary/50 transition-all duration-200 smooth-hover button-press slide-in-right'
                 onClick={() => setDepositModalOpen(true)}
               >
                 <Plus className='mr-2 h-4 w-4' />
@@ -166,50 +166,38 @@ export default function AccountPage() {
               </Button>
             </div>
 
-            {/* Tabs */}
-            <Tabs defaultValue='assets' className='w-full'>
-              {/* Sticky Tab Bar */}
-              <div className='sticky top-0 z-20 bg-background pb-2 -mx-4 px-4'>
-                <TabsList className='grid w-full grid-cols-3 bg-muted/50'>
-                  <TabsTrigger
-                    value='assets'
-                    className='data-[state=active]:!bg-primary data-[state=active]:!text-white data-[state=active]:!shadow-sm'
-                  >
-                    {t('navigation.assets')}
+            {/* Content */}
+            <div className='w-full'>
+              <Tabs defaultValue='assets' className='w-full'>
+                <TabsList className='w-full h-12 rounded-xl bg-muted/40 p-1 shadow-sm'>
+                  <TabsTrigger value='assets' className='flex-1 h-10 text-sm md:text-base'>
+                    Assets
                   </TabsTrigger>
-                  <TabsTrigger
-                    value='devices'
-                    className='data-[state=active]:!bg-primary data-[state=active]:!text-white data-[state=active]:!shadow-sm'
-                  >
-                    {t('navigation.devices')}
+                  <TabsTrigger value='devices' className='flex-1 h-10 text-sm md:text-base'>
+                    Devices
                   </TabsTrigger>
-                  <TabsTrigger
-                    value='settings'
-                    className='data-[state=active]:!bg-primary data-[state=active]:!text-white data-[state=active]:!shadow-sm'
-                  >
-                    {t('navigation.settings')}
+                  <TabsTrigger value='settings' className='flex-1 h-10 text-sm md:text-base'>
+                    Settings
                   </TabsTrigger>
                 </TabsList>
-              </div>
 
-              <TabsContent value='assets' className='mt-4'>
-                <ErrorBoundary>
-                  <AssetsTab />
-                </ErrorBoundary>
-              </TabsContent>
-
-              <TabsContent value='devices' className='mt-4'>
-                <ErrorBoundary>
-                  <DevicesTab />
-                </ErrorBoundary>
-              </TabsContent>
-
-              <TabsContent value='settings' className='mt-4'>
-                <ErrorBoundary>
-                  <SettingsTab />
-                </ErrorBoundary>
-              </TabsContent>
-            </Tabs>
+                <TabsContent value='assets'>
+                  <ErrorBoundary>
+                    <AssetsTab />
+                  </ErrorBoundary>
+                </TabsContent>
+                <TabsContent value='devices'>
+                  <ErrorBoundary>
+                    <DevicesTab />
+                  </ErrorBoundary>
+                </TabsContent>
+                <TabsContent value='settings'>
+                  <ErrorBoundary>
+                    <SettingsTab />
+                  </ErrorBoundary>
+                </TabsContent>
+              </Tabs>
+            </div>
           </div>
         </main>
       </div>
@@ -220,6 +208,7 @@ export default function AccountPage() {
         open={depositModalOpen}
         onOpenChange={setDepositModalOpen}
       />
+
     </>
   );
 }
