@@ -245,8 +245,8 @@ export const DevicesList = () => {
     }, [device.location, device.ip, coordinateCache]);
 
     return (
-      <span className='text-gray-400 break-words max-w-full' title={displayLocation}>
-        {isLoading ? 'Loading...' : smartTruncate(displayLocation, 35)}
+      <span className='text-gray-400 break-words max-w-full truncate' title={displayLocation}>
+        {isLoading ? 'Loading...' : displayLocation}
       </span>
     );
   };
@@ -348,15 +348,15 @@ export const DevicesList = () => {
                         </div>
 
                         {/* Inline Info */}
-                        <div className='space-y-1 text-xs'>
+                        <div className='flex items-center gap-6 text-xs'>
                           {/* Last Active */}
-                          <div className='flex items-center gap-1 text-gray-400'>
+                          <div className='flex items-center gap-1 text-gray-400 flex-shrink-0'>
                             <Clock className='h-3 w-3 flex-shrink-0' />
                             <span>{formatLastSeen(device.lastSeen)}</span>
                           </div>
 
                           {/* Location */}
-                          <div className='flex items-center gap-1 text-gray-400'>
+                          <div className='flex items-center gap-1 text-gray-400 min-w-0 flex-1'>
                             <MapPin className='h-3 w-3 flex-shrink-0' />
                             <LocationDisplay device={device} />
                           </div>
@@ -364,9 +364,9 @@ export const DevicesList = () => {
                       </div>
 
                       {/* Right Side: Badges and Remove Button - Top Aligned */}
-                      <div className='flex items-start gap-2 flex-shrink-0'>
+                      <div className='flex items-start gap-1.5 flex-shrink-0'>
                         {isCurrentDevice(device) && (
-                          <span className='inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'>
+                          <span className='inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'>
                             Current
                           </span>
                         )}
