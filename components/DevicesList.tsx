@@ -41,6 +41,7 @@ export const DevicesList = () => {
   const [deviceToRemove, setDeviceToRemove] = useState<RealDevice | null>(null);
   const [currentDeviceId, setCurrentDeviceId] = useState<string | null>(null);
   const [locationCache, setLocationCache] = useState<Record<string, string>>({});
+  const [coordinateCache, setCoordinateCache] = useState<Record<string, string>>({});
 
   // Mock access token for development
   const accessToken = 'demo-token';
@@ -119,7 +120,32 @@ export const DevicesList = () => {
     return 'Location not available';
   };
 
-  // Function to get city/country from IP (optional enhancement)
+  // Function to get city/country from coordinates (reverse geocoding)
+  const getLocationFromCoordinates = async (lat: number, lng: number) => {
+    const key = `${lat},${lng}`;
+    if (coordinateCache[key]) {
+      return coordinateCache[key];
+    }
+
+    try {
+      const response = await fetch(
+        `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`
+      );
+      const data = await response.json();
+      
+      if (data.city && data.countryName) {
+        const location = `${data.city}, ${data.countryName}`;
+        setCoordinateCache(prev => ({ ...prev, [key]: location }));
+        return location;
+      }
+    } catch (error) {
+      console.log('Failed to get location from coordinates:', error);
+    }
+    
+    return null;
+  };
+
+  // Function to get city/country from IP (fallback)
   const getLocationFromIP = async (ip: string) => {
     if (locationCache[ip]) {
       return locationCache[ip];
@@ -143,6 +169,61 @@ export const DevicesList = () => {
 
   const isCurrentDevice = (device: RealDevice) => {
     return device.deviceId === currentDeviceId;
+  };
+
+  // Component to display location with smart fallback
+  const LocationDisplay = ({ device }: { device: RealDevice }) => {
+    const [displayLocation, setDisplayLocation] = useState<string>('Loading...');
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+      const loadLocation = async () => {
+        setIsLoading(true);
+        
+        // Try coordinates first
+        if (device.location && device.location.lat && device.location.lng) {
+          const coordKey = `${device.location.lat},${device.location.lng}`;
+          
+          // Check cache first
+          if (coordinateCache[coordKey]) {
+            setDisplayLocation(coordinateCache[coordKey]);
+            setIsLoading(false);
+            return;
+          }
+          
+          // Try reverse geocoding
+          const location = await getLocationFromCoordinates(device.location.lat, device.location.lng);
+          if (location) {
+            setDisplayLocation(location);
+            setIsLoading(false);
+            return;
+          }
+        }
+        
+        // Fallback to IP-based location
+        const ipLocation = await getLocationFromIP(device.ip);
+        if (ipLocation) {
+          setDisplayLocation(ipLocation);
+        } else {
+          setDisplayLocation('Location not available');
+        }
+        
+        setIsLoading(false);
+      };
+
+      loadLocation();
+    }, [device.location, device.ip, coordinateCache]);
+
+    return (
+      <div className='flex items-center text-sm text-muted-foreground'>
+        <MapPin className='h-3 w-3 mr-1' />
+        {isLoading ? (
+          <span className='animate-pulse'>Loading location...</span>
+        ) : (
+          <span>{displayLocation}</span>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -203,12 +284,15 @@ export const DevicesList = () => {
                             <Clock className='h-3 w-3 mr-1' />
                             {t('devices.lastActive')}: {formatLastSeen(device.lastSeen)}
                           </div>
-                          <div className='flex items-center text-sm text-muted-foreground'>
-                            <MapPin className='h-3 w-3 mr-1' />
-                            {getLocationString(device)}
-                          </div>
-                          <div className='text-xs text-muted-foreground'>
-                            IP: {device.ip} • Last path: {device.lastActivity.path}
+                          <LocationDisplay device={device} />
+                          <div className='text-xs text-muted-foreground space-y-1'>
+                            <div>IP: {device.ip}</div>
+                            <div>Last path: {device.lastActivity.path}</div>
+                            {device.location && device.location.lat && device.location.lng && (
+                              <div className='text-xs opacity-60'>
+                                Coordinates: {device.location.lat.toFixed(4)}, {device.location.lng.toFixed(4)}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
