@@ -54,16 +54,16 @@ app.use((req, res) => {
 const startServer = async () => {
   try {
     await connectDB();
-    
-    app.listen(PORT, () => {
-      console.log(`🚀 API Server running on port ${PORT}`);
-      console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
-      console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
-    });
   } catch (error) {
-    console.error('Failed to start server:', error);
-    process.exit(1);
+    console.warn('⚠️  MongoDB not connected. Running in in-memory fallback mode for devices API.');
+    // Do not exit; routes will use in-memory storage when DB is unavailable
   }
+
+  app.listen(PORT, () => {
+    console.log(`🚀 API Server running on port ${PORT}`);
+    console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
+    console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
+  });
 };
 
 // Handle uncaught exceptions

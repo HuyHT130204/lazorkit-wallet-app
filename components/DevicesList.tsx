@@ -195,12 +195,6 @@ export const DevicesList = () => {
     });
   };
 
-  // Function to smart truncate location text
-  const smartTruncate = (text: string, maxLength: number = 30) => {
-    if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength - 3) + '...';
-  };
-
   // Component to display location with smart fallback
   const LocationDisplay = ({ device }: { device: RealDevice }) => {
     const [displayLocation, setDisplayLocation] = useState<string>('Loading...');
@@ -245,7 +239,7 @@ export const DevicesList = () => {
     }, [device.location, device.ip, coordinateCache]);
 
     return (
-      <span className='text-gray-400 break-words max-w-full' title={displayLocation}>
+      <span className='truncate'>
         {isLoading ? 'Loading...' : displayLocation}
       </span>
     );
@@ -305,10 +299,10 @@ export const DevicesList = () => {
                   }}
                 >
                   <div 
-                    className='relative p-4 cursor-pointer'
+                    className='p-4 cursor-pointer'
                     onClick={() => toggleExpanded(device.id)}
                   >
-                    <div className='flex items-start gap-3'>
+                    <div className='flex items-center gap-3'>
                       {/* Device Icon */}
                       <div className='relative flex-shrink-0'>
                         <div className={`
@@ -333,71 +327,75 @@ export const DevicesList = () => {
 
                       {/* Device Info */}
                       <div className='flex-1 min-w-0'>
-                        {/* Device Name */}
-                        <div className='mb-1'>
-                          <h4 className='font-medium text-white text-sm truncate'>
-                            {device.name}
-                          </h4>
+                        {/* Header: Device Name + Badges/Buttons - Grid Layout */}
+                        <div className='grid grid-cols-[1fr_auto] gap-x-3 mb-2'>
+                          {/* Device Name */}
+                          <div>
+                            <h4 className='font-medium text-white text-sm truncate'>
+                              {device.name}
+                            </h4>
+                          </div>
+
+                          {/* Right Side: Badges and Remove Button */}
+                          <div className='flex items-start justify-end gap-2 flex-shrink-0'>
+                            {isCurrentDevice(device) && (
+                              <span className='inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'>
+                                Current
+                              </span>
+                            )}
+                            {/* Status */}
+                            {device.isActive ? (
+                              <div className='flex items-center gap-1'>
+                                <Wifi className='h-3 w-3 text-green-500' />
+                                <span className='text-xs text-green-500 font-medium'>Active</span>
+                              </div>
+                            ) : (
+                              <div className='flex items-center gap-1'>
+                                <WifiOff className='h-3 w-3 text-gray-600' />
+                                <span className='text-xs text-gray-500'>Offline</span>
+                              </div>
+                            )}
+                            {/* Remove Button */}
+                            {!isCurrentDevice(device) && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRemoveDevice(device);
+                                }}
+                                className='w-7 h-7 rounded-lg flex items-center justify-center text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-all duration-200 opacity-0 group-hover:opacity-100'
+                              >
+                                <Trash2 className='h-3.5 w-3.5' />
+                              </button>
+                            )}
+                          </div>
                         </div>
 
-                        {/* Browser and OS - Compact */}
+                        {/* Browser and OS - Full Width */}
                         <div className='flex items-center gap-1.5 text-xs text-gray-400 mb-2'>
                           <span className='truncate'>{device.browser}</span>
                           <span className='text-gray-600'>•</span>
                           <span className='truncate'>{device.os}</span>
                         </div>
 
-                        {/* Inline Info */}
-                        <div className='flex items-center gap-6 text-xs pr-32'>
+                        {/* Last Active and Location - Same Row */}
+                        <div className='flex items-center gap-3 text-xs text-gray-400 flex-wrap'>
                           {/* Last Active */}
-                          <div className='flex items-center gap-1 text-gray-400 flex-shrink-0'>
+                          <div className='flex items-center gap-1'>
                             <Clock className='h-3 w-3 flex-shrink-0' />
-                            <span>{formatLastSeen(device.lastSeen)}</span>
+                            <span className='whitespace-nowrap'>{formatLastSeen(device.lastSeen)}</span>
                           </div>
-
+                          
+                          <span className='text-gray-600'>•</span>
+                          
                           {/* Location */}
-                          <div className='flex items-center gap-1 text-gray-400 min-w-0 flex-1'>
+                          <div className='flex items-center gap-1 min-w-0'>
                             <MapPin className='h-3 w-3 flex-shrink-0' />
-                            <LocationDisplay device={device} />
+                            <div className='truncate'>
+                              <LocationDisplay device={device} />
+                            </div>
                           </div>
                         </div>
                       </div>
-
-                    </div>
-
-                    {/* Right Side: Badges and Remove Button - Absolute Positioned */}
-                    <div className='absolute top-4 right-4 flex items-start gap-1.5'>
-                      {isCurrentDevice(device) && (
-                        <span className='inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'>
-                          Current
-                        </span>
-                      )}
-                      {/* Status */}
-                      {device.isActive ? (
-                        <div className='flex items-center gap-1'>
-                          <Wifi className='h-3 w-3 text-green-500' />
-                          <span className='text-xs text-green-500 font-medium'>Active</span>
-                        </div>
-                      ) : (
-                        <div className='flex items-center gap-1'>
-                          <WifiOff className='h-3 w-3 text-gray-600' />
-                          <span className='text-xs text-gray-500'>Offline</span>
-                        </div>
-                      )}
-
-                      {/* Remove Button */}
-                      {!isCurrentDevice(device) && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRemoveDevice(device);
-                          }}
-                          className='w-7 h-7 rounded-lg flex items-center justify-center text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-all duration-200 opacity-0 group-hover:opacity-100'
-                        >
-                          <Trash2 className='h-3.5 w-3.5' />
-                        </button>
-                      )}
-                    </div>
                     </div>
 
                     {/* Expanded Details */}

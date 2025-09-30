@@ -93,8 +93,12 @@ export const registerDevice = async (accessToken) => {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to register device');
+      let message = 'Failed to register device';
+      try {
+        const error = await response.json();
+        message = error?.error || message;
+      } catch {}
+      throw new Error(message);
     }
 
     const result = await response.json();
@@ -127,8 +131,9 @@ export const sendHeartbeat = async (accessToken, path = null) => {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to send heartbeat');
+      // swallow heartbeat errors to avoid noisy console during dev
+      try { await response.json(); } catch {}
+      return false;
     }
 
     const result = await response.json();
@@ -150,8 +155,12 @@ export const getUserDevices = async (accessToken) => {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to fetch devices');
+      let message = 'Failed to fetch devices';
+      try {
+        const error = await response.json();
+        message = error?.error || message;
+      } catch {}
+      throw new Error(message);
     }
 
     const result = await response.json();

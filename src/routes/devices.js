@@ -1,6 +1,33 @@
 const express = require('express');
 const router = express.Router();
-const Device = require('../models/Device');
+let Device;
+try {
+  Device = require('../models/Device');
+} catch (_) {
+  Device = null;
+}
+const { isConnected } = require('../db');
+const isDbConnected = () => {
+  try { return typeof isConnected === 'function' ? isConnected() : false; } catch { return false; }
+};
+
+// In-memory fallback store when MongoDB is unavailable (dev only)
+const memoryStore = {
+  devices: [],
+  findOneAndUpdate: async (query, update, options) => {
+    let device = memoryStore.devices.find(d => d.userId === query.userId && d.deviceId === query.deviceId && (query.revoked === undefined || d.revoked === query.revoked));
+    if (!device && options?.upsert) {
+      device = { _id: `${Date.now()}`, revoked: false, createdAt: new Date(), lastSeen: new Date(), lastActivity: { path: '/', at: new Date() }, ...update };
+      memoryStore.devices.push(device);
+    } else if (device) {
+      Object.assign(device, update);
+    }
+    return options?.new ? device : null;
+  },
+  find: async (query) => {
+    return memoryStore.devices.filter(d => d.userId === query.userId && (query.revoked === undefined || d.revoked === query.revoked));
+  }
+};
 const { authenticate } = require('../middleware/authenticate');
 
 // Helper function to get client IP
@@ -48,7 +75,8 @@ router.post('/register', authenticate, async (req, res) => {
     const deviceName = `${browser} on ${os}`;
     
     // Upsert device
-    const device = await Device.findOneAndUpdate(
+    const model = (!Device || !isDbConnected()) ? memoryStore : Device;
+    const device = await model.findOneAndUpdate(
       { userId, deviceId },
       {
         userId,
@@ -107,7 +135,8 @@ router.post('/heartbeat', authenticate, async (req, res) => {
       });
     }
 
-    const device = await Device.findOneAndUpdate(
+    const model = (!Device || !isDbConnected()) ? memoryStore : Device;
+    const device = await model.findOneAndUpdate(
       { userId, deviceId, revoked: false },
       {
         lastSeen: new Date(),
@@ -142,9 +171,15 @@ router.get('/', authenticate, async (req, res) => {
   try {
     const userId = req.user.id;
     
-    const devices = await Device.find({ userId, revoked: false })
-      .sort({ lastSeen: -1 })
-      .select('-refreshTokenHash -__v');
+    let devices;
+    if (!Device || !isDbConnected()) {
+      devices = (await memoryStore.find({ userId, revoked: false }))
+        .sort((a, b) => new Date(b.lastSeen) - new Date(a.lastSeen));
+    } else {
+      devices = await Device.find({ userId, revoked: false })
+        .sort({ lastSeen: -1 })
+        .select('-refreshTokenHash -__v');
+    }
 
     const devicesWithActive = devices.map(device => ({
       id: device._id,
@@ -179,7 +214,8 @@ router.post('/:deviceId/revoke', authenticate, async (req, res) => {
     const { deviceId } = req.params;
     const userId = req.user.id;
     
-    const device = await Device.findOneAndUpdate(
+    const model = (!Device || !isDbConnected()) ? memoryStore : Device;
+    const device = await model.findOneAndUpdate(
       { userId, deviceId },
       { 
         revoked: true,
@@ -212,7 +248,8 @@ router.post('/:deviceId/signout', authenticate, async (req, res) => {
     const { deviceId } = req.params;
     const userId = req.user.id;
     
-    const device = await Device.findOneAndUpdate(
+    const model = (!Device || !isDbConnected()) ? memoryStore : Device;
+    const device = await model.findOneAndUpdate(
       { userId, deviceId },
       { 
         revoked: true,
