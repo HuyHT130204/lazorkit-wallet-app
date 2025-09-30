@@ -113,7 +113,7 @@ export const DevicesList = () => {
 
   // Function to get location string from coordinates or IP
   const getLocationString = (device: RealDevice) => {
-    if (device.location) {
+    if (device.location && device.location.lat && device.location.lng) {
       return `${device.location.lat.toFixed(4)}, ${device.location.lng.toFixed(4)}`;
     }
     return 'Location not available';
