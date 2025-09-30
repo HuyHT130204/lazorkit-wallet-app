@@ -245,7 +245,7 @@ export const DevicesList = () => {
     }, [device.location, device.ip, coordinateCache]);
 
     return (
-      <span className='text-gray-400 break-words max-w-full truncate' title={displayLocation}>
+      <span className='text-gray-400 break-words max-w-full' title={displayLocation}>
         {isLoading ? 'Loading...' : displayLocation}
       </span>
     );
@@ -305,7 +305,7 @@ export const DevicesList = () => {
                   }}
                 >
                   <div 
-                    className='p-4 cursor-pointer'
+                    className='relative p-4 cursor-pointer'
                     onClick={() => toggleExpanded(device.id)}
                   >
                     <div className='flex items-start gap-3'>
@@ -348,7 +348,7 @@ export const DevicesList = () => {
                         </div>
 
                         {/* Inline Info */}
-                        <div className='flex items-center gap-6 text-xs'>
+                        <div className='flex items-center gap-6 text-xs pr-32'>
                           {/* Last Active */}
                           <div className='flex items-center gap-1 text-gray-400 flex-shrink-0'>
                             <Clock className='h-3 w-3 flex-shrink-0' />
@@ -363,39 +363,41 @@ export const DevicesList = () => {
                         </div>
                       </div>
 
-                      {/* Right Side: Badges and Remove Button - Top Aligned */}
-                      <div className='flex items-start gap-1.5 flex-shrink-0'>
-                        {isCurrentDevice(device) && (
-                          <span className='inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'>
-                            Current
-                          </span>
-                        )}
-                        {/* Status */}
-                        {device.isActive ? (
-                          <div className='flex items-center gap-1'>
-                            <Wifi className='h-3 w-3 text-green-500' />
-                            <span className='text-xs text-green-500 font-medium'>Active</span>
-                          </div>
-                        ) : (
-                          <div className='flex items-center gap-1'>
-                            <WifiOff className='h-3 w-3 text-gray-600' />
-                            <span className='text-xs text-gray-500'>Offline</span>
-                          </div>
-                        )}
+                    </div>
 
-                        {/* Remove Button */}
-                        {!isCurrentDevice(device) && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRemoveDevice(device);
-                            }}
-                            className='w-7 h-7 rounded-lg flex items-center justify-center text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-all duration-200 opacity-0 group-hover:opacity-100'
-                          >
-                            <Trash2 className='h-3.5 w-3.5' />
-                          </button>
-                        )}
-                      </div>
+                    {/* Right Side: Badges and Remove Button - Absolute Positioned */}
+                    <div className='absolute top-4 right-4 flex items-start gap-1.5'>
+                      {isCurrentDevice(device) && (
+                        <span className='inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'>
+                          Current
+                        </span>
+                      )}
+                      {/* Status */}
+                      {device.isActive ? (
+                        <div className='flex items-center gap-1'>
+                          <Wifi className='h-3 w-3 text-green-500' />
+                          <span className='text-xs text-green-500 font-medium'>Active</span>
+                        </div>
+                      ) : (
+                        <div className='flex items-center gap-1'>
+                          <WifiOff className='h-3 w-3 text-gray-600' />
+                          <span className='text-xs text-gray-500'>Offline</span>
+                        </div>
+                      )}
+
+                      {/* Remove Button */}
+                      {!isCurrentDevice(device) && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveDevice(device);
+                          }}
+                          className='w-7 h-7 rounded-lg flex items-center justify-center text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-all duration-200 opacity-0 group-hover:opacity-100'
+                        >
+                          <Trash2 className='h-3.5 w-3.5' />
+                        </button>
+                      )}
+                    </div>
                     </div>
 
                     {/* Expanded Details */}
