@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Smartphone, Trash2, Plus, MapPin, Clock, Wifi, WifiOff } from 'lucide-react';
+import { Smartphone, Trash2, Plus, MapPin, Clock, Wifi, WifiOff, Monitor, Tablet, ChevronDown } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { AddDeviceModal } from './add-device-modal';
@@ -42,6 +42,7 @@ export const DevicesList = () => {
   const [currentDeviceId, setCurrentDeviceId] = useState<string | null>(null);
   const [locationCache, setLocationCache] = useState<Record<string, string>>({});
   const [coordinateCache, setCoordinateCache] = useState<Record<string, string>>({});
+  const [expandedDevices, setExpandedDevices] = useState<Set<string>>(new Set());
 
   // Mock access token for development
   const accessToken = 'demo-token';
@@ -171,6 +172,35 @@ export const DevicesList = () => {
     return device.deviceId === currentDeviceId;
   };
 
+  // Get device icon based on platform
+  const getDeviceIcon = (platform: string) => {
+    const platformLower = platform.toLowerCase();
+    if (platformLower.includes('mobile') || platformLower.includes('phone')) {
+      return Smartphone;
+    } else if (platformLower.includes('tablet') || platformLower.includes('ipad')) {
+      return Tablet;
+    }
+    return Monitor;
+  };
+
+  const toggleExpanded = (deviceId: string) => {
+    setExpandedDevices(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(deviceId)) {
+        newSet.delete(deviceId);
+      } else {
+        newSet.add(deviceId);
+      }
+      return newSet;
+    });
+  };
+
+  // Function to smart truncate location text
+  const smartTruncate = (text: string, maxLength: number = 30) => {
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength - 3) + '...';
+  };
+
   // Component to display location with smart fallback
   const LocationDisplay = ({ device }: { device: RealDevice }) => {
     const [displayLocation, setDisplayLocation] = useState<string>('Loading...');
@@ -215,120 +245,211 @@ export const DevicesList = () => {
     }, [device.location, device.ip, coordinateCache]);
 
     return (
-      <div className='flex items-center text-sm text-muted-foreground'>
-        <MapPin className='h-3 w-3 mr-1' />
-        {isLoading ? (
-          <span className='animate-pulse'>Loading location...</span>
-        ) : (
-          <span>{displayLocation}</span>
-        )}
-      </div>
+      <span className='text-gray-400 break-words max-w-full' title={displayLocation}>
+        {isLoading ? 'Loading...' : smartTruncate(displayLocation, 35)}
+      </span>
     );
   };
 
   return (
-    <div className='space-y-6'>
+    <div className='space-y-4'>
       {/* Header */}
-      <div className='flex items-center justify-between'>
-        <h3 className='text-lg font-semibold'>{t('devices.title')}</h3>
+      <div className='flex items-center justify-between px-1'>
+        <div>
+          <h3 className='text-lg font-semibold text-white'>{t('devices.title')}</h3>
+          <p className='text-xs text-gray-500 mt-0.5'>
+            Manage devices connected to your account
+          </p>
+        </div>
         <Button
-          variant='outline'
-          size='sm'
           onClick={() => setAddDeviceModalOpen(true)}
+          className='bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-3 py-2 h-9 flex items-center gap-1.5 transition-all duration-200'
         >
-          <Plus className='mr-2 h-4 w-4' />
-          {t('devices.addDevice')}
+          <Plus className='h-4 w-4' />
+          <span className='text-sm font-medium'>Add Device</span>
         </Button>
       </div>
 
       {/* Devices List */}
-      <div className='space-y-3'>
+      <div className='space-y-2.5'>
         {loading
           ? Array.from({ length: 3 }).map((_, i) => (
-              <Card key={i}>
-                <CardContent className='p-4'>
-                  <div className='h-5 w-1/2 bg-muted/40 rounded animate-pulse mb-2' />
-                  <div className='h-4 w-1/3 bg-muted/30 rounded animate-pulse' />
-                </CardContent>
-              </Card>
+              <div 
+                key={i}
+                className='bg-gray-800/40 backdrop-blur-sm rounded-xl p-4 animate-pulse'
+              >
+                <div className='flex items-center gap-3'>
+                  <div className='w-11 h-11 bg-gray-700/50 rounded-lg flex-shrink-0' />
+                  <div className='flex-1 space-y-2'>
+                    <div className='h-4 w-2/5 bg-gray-700/50 rounded' />
+                    <div className='h-3 w-3/5 bg-gray-700/50 rounded' />
+                  </div>
+                </div>
+              </div>
             ))
-          : devices.map((device) => (
-              <Card key={device.id} className={isCurrentDevice(device) ? 'ring-2 ring-blue-500' : ''}>
-                <CardContent className='p-4'>
-                  <div className='flex items-start justify-between'>
-                    <div className='flex items-start space-x-3'>
-                      <div className='w-10 h-10 bg-muted rounded-full flex items-center justify-center'>
-                        <Smartphone className='h-5 w-5 text-muted-foreground' />
+          : devices.map((device, index) => {
+              const DeviceIcon = getDeviceIcon(device.platform);
+              const isExpanded = expandedDevices.has(device.id);
+              return (
+                <div 
+                  key={device.id}
+                  className={`
+                    group relative backdrop-blur-sm rounded-xl transition-all duration-300
+                    ${isCurrentDevice(device) 
+                      ? 'bg-gray-800/60 ring-1 ring-indigo-500/40' 
+                      : 'bg-gray-800/40 hover:bg-gray-800/60'
+                    }
+                  `}
+                  style={{
+                    animation: `fadeInUp 0.3s ease-out ${index * 0.05}s both`
+                  }}
+                >
+                  <div 
+                    className='p-4 cursor-pointer'
+                    onClick={() => toggleExpanded(device.id)}
+                  >
+                    <div className='flex items-start gap-3'>
+                      {/* Device Icon */}
+                      <div className='relative flex-shrink-0'>
+                        <div className={`
+                          w-11 h-11 rounded-lg flex items-center justify-center
+                          transition-all duration-300
+                          ${isCurrentDevice(device)
+                            ? 'bg-gradient-to-br from-indigo-500 to-indigo-600'
+                            : 'bg-gray-700/50'
+                          }
+                        `}>
+                          <DeviceIcon className={`
+                            h-5 w-5 transition-colors duration-300
+                            ${isCurrentDevice(device) ? 'text-white' : 'text-gray-300'}
+                          `} />
+                        </div>
+                        
+                        {/* Active Indicator */}
+                        {device.isActive && (
+                          <div className='absolute -top-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-900' />
+                        )}
                       </div>
-                      <div className='flex-1'>
-                        <div className='flex items-center gap-2'>
-                          <div className='font-semibold'>{device.name}</div>
-                          {isCurrentDevice(device) && (
-                            <span className='text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full'>
-                              Current
-                            </span>
-                          )}
-                          <div className='flex items-center'>
-                            {device.isActive ? (
-                              <Wifi className='h-3 w-3 text-green-500' />
-                            ) : (
-                              <WifiOff className='h-3 w-3 text-gray-400' />
-                            )}
+
+                      {/* Device Info */}
+                      <div className='flex-1 min-w-0'>
+                        {/* Device Name */}
+                        <div className='mb-1'>
+                          <h4 className='font-medium text-white text-sm truncate'>
+                            {device.name}
+                          </h4>
+                        </div>
+
+                        {/* Browser and OS - Compact */}
+                        <div className='flex items-center gap-1.5 text-xs text-gray-400 mb-2'>
+                          <span className='truncate'>{device.browser}</span>
+                          <span className='text-gray-600'>•</span>
+                          <span className='truncate'>{device.os}</span>
+                        </div>
+
+                        {/* Inline Info */}
+                        <div className='space-y-1 text-xs'>
+                          {/* Last Active */}
+                          <div className='flex items-center gap-1 text-gray-400'>
+                            <Clock className='h-3 w-3 flex-shrink-0' />
+                            <span>{formatLastSeen(device.lastSeen)}</span>
+                          </div>
+
+                          {/* Location */}
+                          <div className='flex items-center gap-1 text-gray-400'>
+                            <MapPin className='h-3 w-3 flex-shrink-0' />
+                            <LocationDisplay device={device} />
                           </div>
                         </div>
-                        <div className='text-sm text-muted-foreground mb-2'>
-                          {device.browser} on {device.os} • {device.platform}
-                        </div>
-                        <div className='space-y-1'>
-                          <div className='flex items-center text-sm text-muted-foreground'>
-                            <Clock className='h-3 w-3 mr-1' />
-                            {t('devices.lastActive')}: {formatLastSeen(device.lastSeen)}
+                      </div>
+
+                      {/* Right Side: Badges and Remove Button - Top Aligned */}
+                      <div className='flex items-start gap-2 flex-shrink-0'>
+                        {isCurrentDevice(device) && (
+                          <span className='inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'>
+                            Current
+                          </span>
+                        )}
+                        {/* Status */}
+                        {device.isActive ? (
+                          <div className='flex items-center gap-1'>
+                            <Wifi className='h-3 w-3 text-green-500' />
+                            <span className='text-xs text-green-500 font-medium'>Active</span>
                           </div>
-                          <LocationDisplay device={device} />
-                          <div className='text-xs text-muted-foreground space-y-1'>
-                            <div>IP: {device.ip}</div>
-                            <div>Last path: {device.lastActivity.path}</div>
-                            {device.location && device.location.lat && device.location.lng && (
-                              <div className='text-xs opacity-60'>
-                                Coordinates: {device.location.lat.toFixed(4)}, {device.location.lng.toFixed(4)}
-                              </div>
-                            )}
+                        ) : (
+                          <div className='flex items-center gap-1'>
+                            <WifiOff className='h-3 w-3 text-gray-600' />
+                            <span className='text-xs text-gray-500'>Offline</span>
                           </div>
-                        </div>
+                        )}
+
+                        {/* Remove Button */}
+                        {!isCurrentDevice(device) && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveDevice(device);
+                            }}
+                            className='w-7 h-7 rounded-lg flex items-center justify-center text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-all duration-200 opacity-0 group-hover:opacity-100'
+                          >
+                            <Trash2 className='h-3.5 w-3.5' />
+                          </button>
+                        )}
                       </div>
                     </div>
 
-                    {!isCurrentDevice(device) && (
-                      <Button
-                        variant='ghost'
-                        size='sm'
-                        onClick={() => handleRemoveDevice(device)}
-                        className='text-destructive hover:text-destructive'
-                      >
-                        <Trash2 className='h-4 w-4' />
-                      </Button>
-                    )}
+                    {/* Expanded Details */}
+                    <div 
+                      className={`
+                        overflow-hidden transition-all duration-300 ease-in-out
+                        ${isExpanded ? 'max-h-32 opacity-100 mt-3' : 'max-h-0 opacity-0'}
+                      `}
+                    >
+                      <div className='pt-3 border-t border-gray-700/50 space-y-1.5 text-xs'>
+                        <div className='flex items-start gap-2'>
+                          <span className='text-gray-500 min-w-[80px]'>IP Address:</span>
+                          <span className='text-gray-400 font-mono'>{device.ip}</span>
+                        </div>
+                        <div className='flex items-start gap-2'>
+                          <span className='text-gray-500 min-w-[80px]'>Last path:</span>
+                          <span className='text-gray-400 truncate'>{device.lastActivity.path}</span>
+                        </div>
+                        {device.location && device.location.lat && device.location.lng && (
+                          <div className='flex items-start gap-2'>
+                            <span className='text-gray-500 min-w-[80px]'>Coordinates:</span>
+                            <span className='text-gray-400'>{device.location.lat.toFixed(4)}, {device.location.lng.toFixed(4)}</span>
+                          </div>
+                        )}
+                        <div className='flex items-start gap-2'>
+                          <span className='text-gray-500 min-w-[80px]'>Platform:</span>
+                          <span className='text-gray-400 capitalize'>{device.platform}</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
+                </div>
+              );
+            })}
       </div>
 
       {/* Empty State */}
       {!loading && devices.length === 0 && (
-        <Card>
-          <CardContent className='p-6 text-center'>
-            <Smartphone className='h-12 w-12 text-muted-foreground mx-auto mb-4' />
-            <h3 className='font-semibold mb-2'>No devices connected</h3>
-            <p className='text-muted-foreground mb-4'>
-              Add a device to manage your wallet across multiple platforms.
-            </p>
-            <Button onClick={() => setAddDeviceModalOpen(true)}>
-              <Plus className='mr-2 h-4 w-4' />
-              {t('devices.addDevice')}
-            </Button>
-          </CardContent>
-        </Card>
+        <div className='bg-gray-800/30 backdrop-blur-sm rounded-xl p-10 text-center border border-dashed border-gray-700'>
+          <div className='w-12 h-12 bg-gray-700/50 rounded-xl flex items-center justify-center mx-auto mb-3'>
+            <Smartphone className='h-6 w-6 text-gray-500' />
+          </div>
+          <h3 className='font-semibold text-base text-white mb-1.5'>No devices connected</h3>
+          <p className='text-sm text-gray-400 mb-5 max-w-sm mx-auto'>
+            Add a device to manage your wallet across multiple platforms and keep your account secure.
+          </p>
+          <Button 
+            onClick={() => setAddDeviceModalOpen(true)}
+            className='bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-5 py-2 h-9 flex items-center gap-2 mx-auto transition-all duration-200'
+          >
+            <Plus className='h-4 w-4' />
+            <span className='text-sm font-medium'>Add Device</span>
+          </Button>
+        </div>
       )}
 
       {/* Modals */}
@@ -343,6 +464,33 @@ export const DevicesList = () => {
         device={deviceToRemove}
         onConfirm={confirmRemoveDevice}
       />
+
+      {/* CSS Animations */}
+      <style jsx>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+
+        .animate-fadeIn {
+          animation: fadeIn 0.2s ease-out;
+        }
+      `}</style>
     </div>
   );
 };
