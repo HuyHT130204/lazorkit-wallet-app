@@ -6,6 +6,7 @@ import { Analytics } from '@vercel/analytics/next';
 import './globals.css';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/toaster';
+import { DeviceManagerProvider } from '@/components/device-manager-provider';
 import { Suspense } from 'react';
 
 export const metadata: Metadata = {
@@ -38,8 +39,10 @@ export default function RootLayout({
             enableSystem={false}
             disableTransitionOnChange
           >
-            {children}
-            <Toaster />
+            <DeviceManagerProvider>
+              {children}
+              <Toaster />
+            </DeviceManagerProvider>
           </ThemeProvider>
         </Suspense>
         <Analytics />

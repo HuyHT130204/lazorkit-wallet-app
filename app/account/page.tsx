@@ -181,17 +181,17 @@ export default function AccountPage() {
                   </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value='assets'>
+                <TabsContent value='assets' className='mt-4'>
                   <ErrorBoundary>
                     <AssetsTab />
                   </ErrorBoundary>
                 </TabsContent>
-                <TabsContent value='devices'>
+                <TabsContent value='devices' className='mt-4'>
                   <ErrorBoundary>
                     <DevicesTab />
                   </ErrorBoundary>
                 </TabsContent>
-                <TabsContent value='settings'>
+                <TabsContent value='settings' className='mt-4'>
                   <ErrorBoundary>
                     <SettingsTab />
                   </ErrorBoundary>

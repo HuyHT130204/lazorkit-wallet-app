@@ -7,9 +7,9 @@ import { ViewportModal } from './ui/viewport-modal';
 import { Card, CardContent } from './ui/card';
 import { CopyButton } from './ui/copy-button';
 import { QRCode } from '@/lib/utils/qr';
-import { useWalletStore } from '@/lib/store/wallet';
 import { t } from '@/lib/i18n';
 import { toast } from '@/hooks/use-toast';
+import { registerDevice } from '@/src/utils/device';
 
 interface AddDeviceModalProps {
   open: boolean;
@@ -17,7 +17,6 @@ interface AddDeviceModalProps {
 }
 
 export const AddDeviceModal = ({ open, onOpenChange }: AddDeviceModalProps) => {
-  const { addDevice } = useWalletStore();
   const [pairingLink] = useState('https://lazorkit.com/pair/abc123xyz');
 
   const handleCopyLink = async () => {
@@ -37,27 +36,33 @@ export const AddDeviceModal = ({ open, onOpenChange }: AddDeviceModalProps) => {
     }
   };
 
-  const handleAddDemoDevice = () => {
-    const newDevice = {
-      id: Date.now().toString(),
-      name: 'Demo Device',
-      platform: 'Web' as const,
-      lastActive: 'Just now',
-      location: 'Current Location',
-    };
+  const handleAddDemoDevice = async () => {
+    try {
+      // Mock access token for development
+      const accessToken = 'demo-token';
+      
+      // Register current device
+      const device = await registerDevice(accessToken);
+      
+      console.log('device_added', {
+        deviceId: device.deviceId,
+        deviceName: device.name,
+      });
 
-    addDevice(newDevice);
-    console.log('device_add_opened', {
-      deviceId: newDevice.id,
-      deviceName: newDevice.name,
-    });
+      toast({
+        title: 'Device added',
+        description: 'Current device has been registered successfully',
+      });
 
-    toast({
-      title: 'Device added',
-      description: 'Demo device has been added successfully',
-    });
-
-    onOpenChange(false);
+      onOpenChange(false);
+    } catch (error) {
+      console.error('Failed to add device:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to register device',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
@@ -105,7 +110,7 @@ export const AddDeviceModal = ({ open, onOpenChange }: AddDeviceModalProps) => {
               size='sm'
             >
               <Smartphone className='mr-2 h-4 w-4' />
-              {t('devices.addDemoDevice')}
+              Register Current Device
             </Button>
           </div>
 

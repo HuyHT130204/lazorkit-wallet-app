@@ -12,13 +12,34 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from './ui/alert-dialog';
-import { Device } from '@/lib/store/wallet';
 import { t } from '@/lib/i18n';
+
+// Real device type based on API response
+interface RealDevice {
+  id: string;
+  deviceId: string;
+  name: string;
+  platform: string;
+  browser: string;
+  os: string;
+  ip: string;
+  location?: {
+    lat: number;
+    lng: number;
+  };
+  createdAt: string;
+  lastSeen: string;
+  lastActivity: {
+    path: string;
+    at: string;
+  };
+  isActive: boolean;
+}
 
 interface RemoveDeviceDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  device: Device | null;
+  device: RealDevice | null;
   onConfirm: () => void;
 }
 

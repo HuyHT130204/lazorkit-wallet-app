@@ -35,7 +35,6 @@ export type {
   Activity,
 };
 import { sampleTokens } from '@/lib/mock-data/tokens';
-import { sampleDevices } from '@/lib/mock-data/devices';
 import { sampleApps } from '@/lib/mock-data/apps';
 import { sampleActivity } from '@/lib/mock-data/activity';
 
@@ -75,8 +74,6 @@ export interface WalletState {
   swapReal: (fromToken: TokenSym, toToken: TokenSym, amount: number) => Promise<boolean>;
   sendFake: (token: TokenSym, amount: number, recipient: string) => void;
   depositFake: (token: TokenSym, amount: number) => void;
-  addDevice: (device: Device) => void;
-  removeDevice: (deviceId: string) => void;
   addActivity: (activity: Activity) => void;
   resetDemoData: () => void;
   // New blockchain functions
@@ -91,7 +88,7 @@ const getInitialData = () => {
     return {
       pubkey: generateFakeWalletAddress(), // Generate new fake address each time
       tokens: sampleTokens,
-      devices: sampleDevices,
+      devices: [],
       apps: sampleApps,
       activity: sampleActivity,
     };
@@ -303,15 +300,6 @@ export const useWalletStore = create<WalletState>()(
           set({ activity: [newActivity, ...state.activity] });
         },
 
-        addDevice: (device) => {
-          const state = get();
-          set({ devices: [...state.devices, device] });
-        },
-
-        removeDevice: (deviceId) => {
-          const state = get();
-          set({ devices: state.devices.filter((d) => d.id !== deviceId) });
-        },
 
         addActivity: (activity) => {
           const state = get();
