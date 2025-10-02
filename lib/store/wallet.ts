@@ -12,15 +12,16 @@ import {
   Activity,
 } from '@/lib/mock-data/types';
 import { 
-  generateFakeWalletAddress, 
   getTokenBalance, 
   getAllTokenBalances,
   getSwapQuote,
   getSwapTransaction,
   defaultConnection,
-  TOKEN_ADDRESSES
+  TOKEN_ADDRESSES,
+  TOKEN_DECIMALS
 } from '@/lib/services/jupiter';
 import { fetchRealTokenData } from '@/lib/services/real-token-service';
+import { getBackendBalance } from '@/lib/services/backend-balance';
 import { Connection } from '@solana/web3.js';
 
 // Re-export types for backward compatibility
@@ -63,6 +64,7 @@ export interface WalletState {
   setHasPasskey: (hasPasskey: boolean) => void;
   setHasWallet: (hasWallet: boolean) => void;
   setPubkey: (pubkey: string) => void;
+  setTokenAmount?: (symbol: TokenSym, amount: number, priceUsdOverride?: number) => void;
   setFiat: (fiat: Fiat) => void;
   onrampFake: (
     amount: number,
@@ -77,16 +79,26 @@ export interface WalletState {
   addActivity: (activity: Activity) => void;
   resetDemoData: () => void;
   // New blockchain functions
-  generateNewWallet: () => void;
+  generateNewWallet?: () => void; // removed in favor of LazorKit connect
   refreshBalances: () => Promise<void>;
   getRealTokenBalance: (tokenMint: string) => Promise<number>;
+  
+  // Fake wallet functions for testing
+  createFakeWallet: () => void;
+  createFakeTransaction: (type: 'swap' | 'send' | 'deposit', data: any) => void;
+  simulateWalletCreation: () => Promise<void>;
+  
+  // Logout and reset functions
+  logout: () => void;
+  resetPasskey: () => void;
+  resetWallet: () => void;
 }
 
 // Only use mock data if demo mode is enabled
 const getInitialData = () => {
   if (ENV_CONFIG.ENABLE_DEMO) {
     return {
-      pubkey: generateFakeWalletAddress(), // Generate new fake address each time
+      pubkey: undefined,
       tokens: sampleTokens,
       devices: [],
       apps: sampleApps,
@@ -129,8 +141,8 @@ export const useWalletStore = create<WalletState>()(
 
       const initialData = getInitialData();
       return {
-        hasPasskey: ENV_CONFIG.ENABLE_DEMO,
-        hasWallet: ENV_CONFIG.ENABLE_DEMO,
+        hasPasskey: false,
+        hasWallet: false,
         pubkey: initialData.pubkey,
         fiat: 'USD',
         rateUsdToVnd: 27000,
@@ -182,8 +194,45 @@ export const useWalletStore = create<WalletState>()(
 
         setHasPasskey: (hasPasskey) => set({ hasPasskey }),
         setHasWallet: (hasWallet) => set({ hasWallet }),
-        setPubkey: (pubkey) => set({ pubkey }),
+        setPubkey: (pubkey) => {
+          if (typeof window !== 'undefined') {
+            (window as any).__lz_pubkey = pubkey;
+          }
+          set({ pubkey });
+        },
         setFiat: (fiat) => set({ fiat }),
+        setTokenAmount: (symbol: TokenSym, amount: number, priceUsdOverride?: number) => {
+          const state = get();
+          console.log('setTokenAmount called:', { symbol, amount, priceUsdOverride });
+          console.log('Current tokens:', state.tokens.map(t => ({ symbol: t.symbol, amount: t.amount })));
+          const idx = state.tokens.findIndex((t) => t.symbol === symbol);
+          if (idx >= 0) {
+            // Update existing token
+            const next = [...state.tokens];
+            next[idx] = {
+              ...next[idx],
+              amount,
+              ...(priceUsdOverride != null ? { priceUsd: priceUsdOverride } : {}),
+            } as any;
+            console.log('Updated existing token:', next[idx]);
+            set({ tokens: next });
+            console.log('Tokens after update:', next.map(t => ({ symbol: t.symbol, amount: t.amount })));
+          } else {
+            // Create new token if not found
+            console.log('Token not found, creating new token:', symbol);
+            const newToken = {
+              symbol,
+              amount,
+              priceUsd: priceUsdOverride ?? 1,
+              change24hPct: 0,
+              mint: TOKEN_ADDRESSES[symbol as keyof typeof TOKEN_ADDRESSES] || '',
+            } as any;
+            const next = [...state.tokens, newToken];
+            set({ tokens: next });
+            console.log('Created new token:', newToken);
+            console.log('Tokens after creation:', next.map(t => ({ symbol: t.symbol, amount: t.amount })));
+          }
+        },
 
         onrampFake: (amount, fiat, token, orderId) => {
           const state = get();
@@ -309,8 +358,8 @@ export const useWalletStore = create<WalletState>()(
         resetDemoData: () => {
           const data = getInitialData();
           set({
-            hasPasskey: ENV_CONFIG.ENABLE_DEMO,
-            hasWallet: ENV_CONFIG.ENABLE_DEMO,
+            hasPasskey: false,
+            hasWallet: false,
             pubkey: data.pubkey,
             fiat: 'USD',
             tokens: data.tokens,
@@ -321,10 +370,7 @@ export const useWalletStore = create<WalletState>()(
         },
 
         // New blockchain functions
-        generateNewWallet: () => {
-          const newAddress = generateFakeWalletAddress();
-          set({ pubkey: newAddress });
-        },
+        // generateNewWallet: removed; handled by LazorKit SDK
 
         refreshBalances: async () => {
           const state = get();
@@ -334,44 +380,115 @@ export const useWalletStore = create<WalletState>()(
           }
 
           try {
-            // Validate connection
+            console.log('🔄 Refreshing balances for wallet:', state.pubkey);
+            
+            // PRIORITY 1: Try to get balance from backend first (our source of truth)
+            try {
+              const backendData = await getBackendBalance(state.pubkey);
+              console.log('📊 Backend balance data:', backendData);
+              
+              if (backendData.balances && Object.keys(backendData.balances).length > 0) {
+                console.log('📊 Processing backend balances:', backendData.balances);
+                
+                // Start with current tokens or create default tokens if empty
+                let nextTokens = [...state.tokens];
+                
+                // If no tokens exist, create default USDC token
+                if (nextTokens.length === 0) {
+                  nextTokens = [{
+                    symbol: 'USDC',
+                    amount: 0,
+                    priceUsd: 1,
+                    change24hPct: 0,
+                    mint: TOKEN_ADDRESSES.USDC || 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
+                  }];
+                  console.log('🔧 Created default USDC token');
+                }
+                
+                // Update each token with backend balance
+                nextTokens = nextTokens.map((token) => {
+                  const backendAmount = backendData.balances[token.symbol];
+                  if (backendAmount !== undefined) {
+                    console.log(`💰 Updating ${token.symbol} from backend: ${backendAmount}`);
+                    return { ...token, amount: backendAmount } as any;
+                  }
+                  return token;
+                });
+                
+                // Add any new tokens from backend that don't exist in current tokens
+                Object.entries(backendData.balances).forEach(([symbol, amount]) => {
+                  const existingToken = nextTokens.find(t => t.symbol === symbol);
+                  if (!existingToken) {
+                    console.log(`➕ Adding new token from backend: ${symbol} = ${amount}`);
+                    nextTokens.push({
+                      symbol: symbol as any,
+                      amount: amount,
+                      priceUsd: 1,
+                      change24hPct: 0,
+                      mint: TOKEN_ADDRESSES[symbol as keyof typeof TOKEN_ADDRESSES] || ''
+                    });
+                  }
+                });
+                
+                console.log('📋 Final tokens array:', nextTokens);
+                set({ tokens: nextTokens });
+                console.log('✅ Balances updated from backend');
+                return; // Success, exit early
+              }
+            } catch (backendError) {
+              console.warn('⚠️ Backend balance fetch failed, falling back to on-chain:', backendError);
+            }
+
+            // FALLBACK: Use on-chain data if backend fails
+            console.log('🔗 Falling back to on-chain balance fetch...');
+            
             if (!defaultConnection) {
-              console.error('No connection available');
+              console.error('No connection available for fallback');
               return;
             }
 
-            // Use real token data service
-            const realTokens = await fetchRealTokenData(state.pubkey, defaultConnection);
-            
-            if (realTokens && realTokens.length > 0) {
-              set({ tokens: realTokens });
-            } else {
-              // Fallback to old method if real service fails
-              const balances = await getAllTokenBalances(state.pubkey, defaultConnection);
-              
-              if (!balances || typeof balances !== 'object') {
-                console.warn('Invalid balances response:', balances);
-                return;
-              }
+            const balances = await getAllTokenBalances(state.pubkey, defaultConnection);
 
-              const newTokens = state.tokens.map(token => {
-                try {
-                  const mint = TOKEN_ADDRESSES[token.symbol as keyof typeof TOKEN_ADDRESSES];
-                  if (mint && balances.has(mint)) {
-                    const balance = balances.get(mint);
-                    return { ...token, amount: typeof balance === 'number' ? balance : 0 };
-                  }
-                  return token;
-                } catch (error) {
-                  console.warn('Error processing token:', token.symbol, error);
-                  return token;
-                }
-              });
-              
-              set({ tokens: newTokens });
+            if (!balances || typeof balances !== 'object') {
+              console.warn('Invalid balances response:', balances);
+              return;
             }
+
+            const symbolToMint = TOKEN_ADDRESSES as Record<string, string>;
+            const mintToSymbol: Record<string, TokenSym> = Object.keys(symbolToMint).reduce((acc, sym) => {
+              acc[symbolToMint[sym]] = sym as TokenSym;
+              return acc;
+            }, {} as Record<string, TokenSym>);
+
+            // Start from current tokens; update when we find balances
+            let nextTokens = [...state.tokens];
+
+            // Update known tokens based on mint mapping
+            nextTokens = nextTokens.map((tk) => {
+              const mint = symbolToMint[tk.symbol];
+              if (mint && balances.has(mint)) {
+                const bal = balances.get(mint) as number;
+                return { ...tk, amount: bal } as any;
+              }
+              return tk;
+            });
+
+            // Add any extra mints that are not mapped; put them under USDC slot if empty
+            for (const [mint, bal] of balances.entries()) {
+              const symbol = mintToSymbol[mint];
+              if (!symbol) {
+                // place under USDC slot if its amount is 0
+                const idx = nextTokens.findIndex((t) => t.symbol === 'USDC');
+                if (idx >= 0 && (nextTokens[idx].amount || 0) === 0) {
+                  nextTokens[idx] = { ...nextTokens[idx], amount: bal, priceUsd: 1 } as any;
+                }
+              }
+            }
+
+            set({ tokens: nextTokens });
+            console.log('✅ Balances updated from on-chain fallback');
           } catch (error) {
-            console.error('Error refreshing balances:', error);
+            console.error('❌ Error refreshing balances:', error);
             // Don't throw error, just log it
           }
         },
@@ -429,8 +546,12 @@ export const useWalletStore = create<WalletState>()(
               return false;
             }
 
+            // Convert amount to raw units using correct decimals of from token
+            const decimals = TOKEN_DECIMALS[fromToken as keyof typeof TOKEN_DECIMALS] ?? 9;
+            const rawAmount = Math.round(amount * Math.pow(10, decimals));
+
             // Get swap quote with error handling
-            const quote = await getSwapQuote(fromMint, toMint, amount * 1e9);
+            const quote = await getSwapQuote(fromMint, toMint, rawAmount);
             if (!quote || typeof quote !== 'object') {
               console.error('Failed to get swap quote or invalid quote:', quote);
               return false;
@@ -456,6 +577,150 @@ export const useWalletStore = create<WalletState>()(
             return false;
           }
         },
+
+        // Fake wallet functions for testing
+        createFakeWallet: () => {
+          const fakeAddress = 'FakeWallet' + Math.random().toString(36).substr(2, 9);
+          console.log('Creating fake wallet with address:', fakeAddress);
+          set({ 
+            pubkey: fakeAddress,
+            hasPasskey: true,
+            hasWallet: true 
+          });
+        },
+
+        createFakeTransaction: (type: 'swap' | 'send' | 'deposit', data: any) => {
+          const state = get();
+          const transactionId = 'fake_tx_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+          
+          console.log(`Creating fake ${type} transaction:`, { transactionId, data });
+          
+          // Tạo activity entry cho transaction
+          const newActivity: Activity = {
+            id: transactionId,
+            kind: type,
+            ts: new Date().toISOString(),
+            summary: `Fake ${type} transaction completed`,
+            amount: data.amount,
+            token: data.token,
+            counterparty: data.recipient,
+            status: 'Success'
+          };
+
+          // Thêm vào activity list
+          set({ activity: [newActivity, ...state.activity] });
+        },
+
+        simulateWalletCreation: async () => {
+          console.log('=== Simulating wallet creation process ===');
+          
+          // Step 1: Simulate passkey creation
+          console.log('Step 1: Creating fake passkey...');
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          set({ hasPasskey: true });
+          console.log('✓ Fake passkey created');
+
+          // Step 2: Simulate wallet creation
+          console.log('Step 2: Creating fake wallet...');
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          const fakeAddress = 'FakeWallet' + Math.random().toString(36).substr(2, 9);
+          set({ 
+            pubkey: fakeAddress,
+            hasWallet: true 
+          });
+          console.log('✓ Fake wallet created with address:', fakeAddress);
+
+          // Step 3: Add some initial fake tokens for testing
+          console.log('Step 3: Adding initial fake tokens...');
+          const initialTokens: TokenHolding[] = [
+            {
+              symbol: 'SOL',
+              amount: 5.0,
+              priceUsd: 95.5,
+              change24hPct: 2.3,
+              mint: 'So11111111111111111111111111111111111111112',
+            },
+            {
+              symbol: 'USDC',
+              amount: 100.0,
+              priceUsd: 1.0,
+              change24hPct: 0.1,
+              mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+            },
+            {
+              symbol: 'USDT',
+              amount: 50.0,
+              priceUsd: 1.0,
+              change24hPct: -0.1,
+              mint: 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB',
+            }
+          ];
+          
+          set({ tokens: initialTokens });
+          console.log('✓ Initial fake tokens added');
+
+          // Step 4: Add some fake activity
+          const fakeActivity: Activity[] = [
+            {
+              id: 'fake_activity_1',
+              kind: 'deposit',
+              ts: new Date().toISOString(),
+              summary: 'Initial deposit of 5 SOL',
+              amount: 5.0,
+              token: 'SOL',
+              status: 'Success'
+            },
+            {
+              id: 'fake_activity_2',
+              kind: 'deposit',
+              ts: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
+              summary: 'Initial deposit of 100 USDC',
+              amount: 100.0,
+              token: 'USDC',
+              status: 'Success'
+            }
+          ];
+          
+          set({ activity: [...fakeActivity, ...get().activity] });
+          console.log('✓ Fake activity added');
+
+          console.log('=== Fake wallet setup complete ===');
+        },
+
+        // Logout and reset functions
+        logout: () => {
+          console.log('Logging out user...');
+          set({
+            hasPasskey: false,
+            hasWallet: false,
+            pubkey: undefined,
+            tokens: [],
+            activity: []
+          });
+          console.log('✓ User logged out successfully');
+          // Redirect to /buy after logout
+          if (typeof window !== 'undefined') {
+            window.location.href = '/buy';
+          }
+        },
+
+        resetPasskey: () => {
+          console.log('Resetting passkey...');
+          set({ hasPasskey: false });
+          console.log('✓ Passkey reset successfully');
+        },
+
+        resetWallet: () => {
+          console.log('Resetting wallet...');
+          set({
+            hasPasskey: false,
+            hasWallet: false,
+            pubkey: undefined,
+            tokens: [],
+            activity: []
+          });
+          console.log('✓ Wallet reset successfully');
+        },
       };
     },
     {
@@ -469,8 +734,8 @@ export const useWalletStore = create<WalletState>()(
           const base = (persistedState && typeof persistedState === 'object') ? (persistedState as Record<string, unknown>) : {};
           return {
             ...base,
-            hasPasskey: ENV_CONFIG.ENABLE_DEMO,
-            hasWallet: ENV_CONFIG.ENABLE_DEMO,
+            hasPasskey: false,
+            hasWallet: false,
             pubkey: initialData.pubkey,
             tokens: initialData.tokens,
             devices: initialData.devices,

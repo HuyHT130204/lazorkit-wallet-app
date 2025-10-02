@@ -76,8 +76,9 @@ router.post('/register', authenticate, async (req, res) => {
     
     // Upsert device
     const model = (!Device || !isDbConnected()) ? memoryStore : Device;
+    // Use compound key (userId + deviceId); avoid unique conflicts on deviceId alone
     const device = await model.findOneAndUpdate(
-      { userId, deviceId },
+      { userId, deviceId, revoked: false },
       {
         userId,
         deviceId,
@@ -96,11 +97,7 @@ router.post('/register', authenticate, async (req, res) => {
           at: new Date()
         }
       },
-      { 
-        upsert: true, 
-        new: true,
-        setDefaultsOnInsert: true
-      }
+      { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
     res.status(200).json({

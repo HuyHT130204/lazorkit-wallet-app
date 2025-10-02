@@ -14,7 +14,6 @@ import {
   useWalletStore,
   Fiat,
   TokenSym,
-  PaymentMethod,
 } from '@/lib/store/wallet';
 import {
   formatCurrency,
@@ -24,6 +23,7 @@ import {
 } from '@/lib/utils/format';
 import { t } from '@/lib/i18n';
 import { JupiterToken, TOKEN_ADDRESSES } from '@/lib/services/jupiter';
+import { useWallet } from '@/hooks/use-lazorkit-wallet';
 
 interface OnRampFormProps {
   onPreview?: (data: OnRampData) => void;
@@ -36,7 +36,6 @@ interface OnRampData {
   fromCurrency: Fiat;
   toToken: TokenSym;
   amount: number;
-  paymentMethod: PaymentMethod;
 }
 
 const currencyIcons: Record<Fiat, string> = {
@@ -61,11 +60,13 @@ const fallbackTokenIcons: Record<string, string> = {
 
 export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCurrency }: OnRampFormProps) => {
   const { rateUsdToVnd } = useWalletStore();
+  const wallet = useWallet() as any;
   const router = useRouter();
+  const PASSKEY_TIMEOUT_MS = Number(process.env.NEXT_PUBLIC_LAZORKIT_PASSKEY_TIMEOUT_MS || '90000');
   const [fromCurrency, setFromCurrency] = useState<Fiat>(initialFromCurrency || 'USD');
   const [toToken, setToToken] = useState<TokenSym>('USDC');
   const [amount, setAmount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card');
+  // Đã loại bỏ lựa chọn phương thức thanh toán; luôn dùng luồng Pay mặc định
   const [selectedQuickAmount, setSelectedQuickAmount] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -155,7 +156,6 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
       fromCurrency,
       toToken,
       amount: amountUsd,
-      paymentMethod,
     };
 
     console.log('onramp_preview_clicked', data);
@@ -185,11 +185,7 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
     return parts.join('.');
   };
 
-  const paymentMethods = [
-    { value: 'card' as PaymentMethod, label: 'Card', icon: '/placeholder-logo.png' },
-    { value: 'applepay' as PaymentMethod, label: 'Apple Pay', icon: '/apple_logo.png' },
-    { value: 'vnpay' as PaymentMethod, label: 'VNPAY QR', icon: '/vietnam_logo.png' },
-  ];
+  // Bỏ danh sách phương thức thanh toán
 
   // Filter tokens based on search
   const allTokens: TokenSym[] = ['SOL','USDC','USDT','BONK','RAY','JUP','ORCA','mSOL','JitoSOL','PYTH'];
@@ -325,32 +321,7 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
           )}
         </div>
 
-        {/* Payment Method */}
-        <div className='mb-2.5'>
-          <div className='text-xs text-muted-foreground mb-1'>
-            {t('onRamp.paymentMethod')}
-          </div>
-          <div className='flex gap-1'>
-            {paymentMethods.map((method) => (
-              <button
-                key={method.value}
-                onClick={() => setPaymentMethod(method.value)}
-                className={`flex-1 py-1.5 px-2 rounded-lg border transition-all flex items-center justify-center gap-1 ${
-                  paymentMethod === method.value
-                    ? 'bg-primary/10 border-primary/50'
-                    : 'bg-muted/5 border-border/50 hover:bg-muted/10'
-                }`}
-              >
-                <span className='text-base'>
-                  <img src={method.icon} alt={method.label} className='w-5 h-5 rounded-sm' />
-                </span>
-                <span className='text-xs font-medium'>{
-                  method.value === 'card' ? t('onRamp.card') : method.value === 'applepay' ? t('onRamp.applePay') : t('onRamp.vnpay')
-                }</span>
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* Đã loại bỏ UI chọn phương thức thanh toán – giữ một nút Pay duy nhất */}
 
         {/* Action Button */}
         <Button
@@ -623,7 +594,7 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
       <OnRampPreviewModal
         open={previewOpen}
         onOpenChange={setPreviewOpen}
-        data={{ fromCurrency, toToken, amount: amountUsd, paymentMethod }}
+        data={{ fromCurrency, toToken, amount: amountUsd }}
         onConfirm={async () => {
           try {
             setIsCreatingOrder(true);
@@ -643,12 +614,75 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
             const networkRounded = Number(network.toFixed(2));
             const total = Number((subtotal + feeRounded + networkRounded).toFixed(2));
 
+            // If user has no passkey yet, create one via Portal (client) and send to backend
+            let passkeyData: any = undefined;
+            const hasPasskey = Boolean((wallet as any)?.passkeyPubkey || (wallet as any)?.account?.passkeyPubkey || useWalletStore.getState().hasPasskey);
+            if (!hasPasskey) {
+              if (!(wallet?.createPasskeyOnly || wallet?.connectPasskey)) {
+                // LazorKit build without createPasskeyOnly → skip passkey creation and let backend handle wallet creation later
+                console.warn('createPasskeyOnly not available; proceeding without passkey data');
+              } else {
+              try {
+                const passkeyFn = (wallet as any).createPasskeyOnly || (wallet as any).connectPasskey;
+                // Prefer SDK timeout option when supported
+                if (passkeyFn && passkeyFn.length > 0) {
+                  passkeyData = await passkeyFn({ timeoutMs: PASSKEY_TIMEOUT_MS });
+                } else {
+                  passkeyData = await passkeyFn();
+                }
+                
+                // Lưu passkeyData vào localStorage để sử dụng trong callback success
+                if (passkeyData) {
+                  try {
+                    localStorage.setItem('lazorkit-passkey-data', JSON.stringify(passkeyData));
+                    console.log('💾 Saved passkeyData to localStorage for callback success');
+                  } catch (e) {
+                    console.warn('Failed to save passkeyData to localStorage:', e);
+                  }
+                }
+              } catch (e: any) {
+                // User denied or platform error – keep user on form instead of redirecting to failed
+                const reason = (e && (e.message || e.toString())) || 'Passkey creation cancelled';
+                console.error('createPasskeyOnly error:', reason);
+                throw new Error(reason);
+              }
+              }
+            }
+
+            // If đã có passkeyData (mới tạo hoặc lấy từ localStorage), kiểm tra ví trước khi tạo order
+            try {
+              const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+              const body = passkeyData ? { passkeyData } : null;
+              if (body) {
+                const resp = await fetch(`${apiBase}/api/orders/check-wallet`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(body),
+                });
+                if (resp.ok) {
+                  const data = await resp.json();
+                  if (data?.exists && data?.walletAddress) {
+                    // Có ví sẵn → cập nhật store để quá trình thanh toán tiếp tục dùng ví này
+                    try {
+                      const store = useWalletStore.getState();
+                      store.setHasWallet?.(true);
+                      store.setPubkey?.(data.walletAddress);
+                    } catch {}
+                    // Không return; tiếp tục tạo order để mua token
+                  }
+                }
+              }
+            } catch (e) {
+              console.warn('check-wallet failed, continue to create order:', e);
+            }
+
             const res = await createWhateeOrder({
               amount: total,
               currency: fromCurrency,
               description: `Buy ${toToken} via Lazorkit`,
               metadata: { toToken, subtotal: String(subtotal), fee: String(feeRounded), network: String(networkRounded) },
               token: toToken,
+              passkeyData,
               orderLines: [
                 { key: 'subtotal', title: 'Subtotal', quantity: 1, unit_price: subtotal, amount: subtotal },
                 { key: 'fee', title: 'Fee', quantity: 1, unit_price: feeRounded, amount: feeRounded },
@@ -663,9 +697,11 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
               // If provider does not return a checkout url, treat as error
               throw new Error('Missing checkoutUrl from provider');
             }
-          } catch (e) {
-            // On error, redirect to failed callback with reason
-            const url = `/callback/failed?reason=${encodeURIComponent((e as Error).message)}&amount=${encodeURIComponent(
+            } catch (e) {
+            // On error, show a concise error without huge payload in query string
+            const raw = (e as Error)?.message || 'Unknown error';
+            const message = raw.length > 160 ? raw.slice(0, 160) + '…' : raw;
+            const url = `/callback/failed?reason=${encodeURIComponent(message)}&amount=${encodeURIComponent(
               amountUsd.toFixed(2)
             )}&token=${encodeURIComponent(toToken)}&currency=${encodeURIComponent(fromCurrency)}`;
             router.push(url);

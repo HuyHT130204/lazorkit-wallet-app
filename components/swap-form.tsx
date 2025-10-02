@@ -71,7 +71,7 @@ export const SwapForm = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [quote, setQuote] = useState<SwapData['quote'] | undefined>(undefined);
   const [loadingQuote, setLoadingQuote] = useState(false);
-  const [useRealSwap, setUseRealSwap] = useState(false);
+  // Always real swap; demo removed
 
   // Sync with provided initial tokens if props change
   useEffect(() => {
@@ -296,16 +296,6 @@ export const SwapForm = ({
             <Settings2 className='h-3 w-3 text-muted-foreground' />
           </button>
           <div className='flex items-center gap-2'>
-            <button
-              onClick={() => setUseRealSwap(!useRealSwap)}
-              className={`px-2 py-1 text-xs rounded-md transition-colors ${
-                useRealSwap 
-                  ? 'bg-primary/20 text-primary border border-primary/30' 
-                  : 'bg-muted/20 text-muted-foreground border border-border/30'
-              }`}
-            >
-              {useRealSwap ? t('notifications.realSwap') : t('notifications.demoSwap')}
-            </button>
             <button className='p-1.5 rounded-lg hover:bg-muted/50 transition-colors'>
               <Settings2 className='h-3.5 w-3.5 text-muted-foreground' />
             </button>
@@ -695,29 +685,17 @@ export const SwapForm = ({
         fee={amountNum * 0.002}
         quote={quote}
         onConfirm={async () => {
-          if (useRealSwap && swapReal) {
-            const success = await swapReal(fromToken, toToken, amountNum);
-            if (success) {
-              toast({
-                title: t('notifications.realSwapConfirmed'),
-                description: `${amountNum} ${fromToken} -> ${estimatedReceive.toFixed(
-                  4
-                )} ${toToken}`,
-              });
-            } else {
-              toast({
-                title: t('notifications.realSwapFailed'),
-                description: t('notifications.realSwapFailedDesc'),
-                variant: 'destructive',
-              });
-            }
-          } else {
-            useWalletStore.getState().swapFake(fromToken, toToken, amountNum);
+          const ok = swapReal ? await swapReal(fromToken, toToken, amountNum) : false;
+          if (ok) {
             toast({
-              title: t('notifications.demoSwapConfirmed'),
-              description: `${amountNum} ${fromToken} -> ${estimatedReceive.toFixed(
-                4
-              )} ${toToken}`,
+              title: t('notifications.realSwapConfirmed'),
+              description: `${amountNum} ${fromToken} -> ${estimatedReceive.toFixed(4)} ${toToken}`,
+            });
+          } else {
+            toast({
+              title: t('notifications.realSwapFailed'),
+              description: t('notifications.realSwapFailedDesc'),
+              variant: 'destructive',
             });
           }
           setReviewOpen(false);

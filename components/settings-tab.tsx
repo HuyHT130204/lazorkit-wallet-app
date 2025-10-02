@@ -30,7 +30,7 @@ import { ENV_CONFIG } from '@/lib/config/env';
 import { WalletManager } from './wallet-manager';
 
 export const SettingsTab = () => {
-  const { fiat, setFiat, resetDemoData, setHasPasskey } = useWalletStore();
+  const { fiat, setFiat, resetDemoData, setHasPasskey, logout } = useWalletStore();
 
   const [walletName, setWalletName] = useState('My Wallet');
   const { language, setLanguage } = useLanguage();
@@ -76,6 +76,23 @@ export const SettingsTab = () => {
       title: 'Testnet airdrop requested',
       description: 'This is a demo - no real tokens will be received.',
     });
+  };
+
+  const handleLogout = () => {
+    try {
+      logout();
+      toast({
+        title: 'Đăng xuất thành công',
+        description: 'Bạn đã đăng xuất khỏi ví.',
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast({
+        title: 'Lỗi đăng xuất',
+        description: 'Không thể đăng xuất. Vui lòng thử lại.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleResetDemoData = () => {
@@ -310,15 +327,27 @@ export const SettingsTab = () => {
                 </p>
               </div>
               
-              <Button
-                variant='destructive'
-                size='sm'
-                onClick={handleResetDemoData}
-                className='w-full h-10 gap-2 font-medium'
-              >
-                <Trash2 className='h-4 w-4' />
-                {t('settings.resetDemoData')}
-              </Button>
+              <div className='space-y-2'>
+                <Button
+                  variant='destructive'
+                  size='sm'
+                  onClick={handleLogout}
+                  className='w-full h-10 gap-2 font-medium'
+                >
+                  <Trash2 className='h-4 w-4' />
+                  Đăng xuất
+                </Button>
+                
+                <Button
+                  variant='destructive'
+                  size='sm'
+                  onClick={handleResetDemoData}
+                  className='w-full h-10 gap-2 font-medium'
+                >
+                  <Trash2 className='h-4 w-4' />
+                  {t('settings.resetDemoData')}
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>

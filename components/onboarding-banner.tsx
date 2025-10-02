@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
 import { useWalletStore } from '@/lib/store/wallet';
+import { useWallet } from '@/hooks/use-lazorkit-wallet';
 import { t } from '@/lib/i18n';
 import { generatePublicKey } from '@/lib/utils/format';
 
@@ -12,23 +13,16 @@ interface OnboardingBannerProps {
 }
 
 export const OnboardingBanner = ({ className }: OnboardingBannerProps) => {
-  const { hasPasskey, hasWallet, setHasPasskey, setHasWallet, setPubkey } = useWalletStore();
+  const { hasPasskey, hasWallet } = useWalletStore();
+  const { isConnecting } = useWallet();
   const [isBusy, setIsBusy] = useState(false);
 
   const handleCreatePasskey = async () => {
-    setIsBusy(true);
-    await new Promise((r) => setTimeout(r, 600));
-    setHasPasskey(true);
-    setIsBusy(false);
+    // Removed in new flow: passkey creation is backend-driven
   };
 
   const handleCreateWallet = async () => {
-    setIsBusy(true);
-    await new Promise((r) => setTimeout(r, 600));
-    const newPubkey = generatePublicKey();
-    setPubkey(newPubkey);
-    setHasWallet(true);
-    setIsBusy(false);
+    // Removed in new flow: wallet creation is backend-driven
   };
 
   if (hasPasskey && hasWallet) return null;
@@ -54,16 +48,8 @@ export const OnboardingBanner = ({ className }: OnboardingBannerProps) => {
           </div>
 
           <div className='flex items-center gap-2'>
-            {!hasPasskey && (
-              <Button size='sm' onClick={handleCreatePasskey} disabled={isBusy}>
-                {isBusy ? t('onRamp.creatingPasskey') : t('onRamp.createPasskey')}
-              </Button>
-            )}
-            {hasPasskey && !hasWallet && (
-              <Button size='sm' onClick={handleCreateWallet} disabled={isBusy}>
-                {isBusy ? t('onRamp.provisioningWallet') : t('onRamp.createWallet')}
-              </Button>
-            )}
+            {/* Removed buttons for creating passkey/wallet on FE per new flow */}
+            {/* SDK disabled: ẩn nút tạo ví */}
           </div>
         </div>
       </CardContent>

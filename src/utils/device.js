@@ -1,8 +1,8 @@
 // Device management utilities for frontend
 
 const DEVICE_ID_KEY = 'device_id';
-const API_BASE_URL = typeof window !== 'undefined' 
-  ? (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001')
+  const API_BASE_URL = typeof window !== 'undefined'
+  ? (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001')
   : 'http://localhost:3001';
 
 // Generate or get device ID from localStorage
@@ -219,7 +219,7 @@ export const signOutDevice = async (accessToken, deviceId) => {
 
 // Heartbeat manager class
 export class HeartbeatManager {
-  constructor(accessToken, intervalMs = 60000) {
+  constructor(accessToken, intervalMs = 120000) {
     this.accessToken = accessToken;
     this.intervalMs = intervalMs;
     this.intervalId = null;

@@ -1,4 +1,37 @@
-## LazorKit Wallet – Tổng hợp thay đổi (3 trạng thái người dùng + hiển thị token)
+## Tích hợp @lazorkit/wallet – Hướng dẫn chạy local (Devnet)
+
+### Cài đặt
+
+```bash
+npm install @lazorkit/wallet
+```
+
+### Biến môi trường (tạo file `.env.local` ở thư mục gốc)
+
+```env
+NEXT_PUBLIC_LAZORKIT_RPC_URL=https://api.devnet.solana.com
+NEXT_PUBLIC_LAZORKIT_PORTAL_URL=https://portal.lazor.sh
+NEXT_PUBLIC_LAZORKIT_PAYMASTER_URL=https://kora-9do3.onrender.com
+NEXT_PUBLIC_ENABLE_MAINNET=false
+```
+
+- Khi muốn thử mainnet: đổi `NEXT_PUBLIC_LAZORKIT_RPC_URL=https://api.mainnet-beta.solana.com` và đặt `NEXT_PUBLIC_ENABLE_MAINNET=true`.
+- Tài liệu SDK: `https://www.npmjs.com/package/@lazorkit/wallet?activeTab=code`.
+
+### Chạy dự án
+
+```bash
+npm run dev
+```
+
+### Ba luồng UI (A/B/C)
+- A: Chưa passkey + chưa ví → trang `/` hiển thị màn Buy Fiat (OnRamp) và nút Kết nối Passkey.
+- B: Có passkey nhưng chưa ví → vẫn chỉ Buy Fiat + nút Tạo Ví (connect SDK).
+- C: Đã kết nối + có ví on-chain → tự động chuyển `/buy`, bật toàn bộ chức năng on-chain.
+
+### Ghi chú
+- Toàn bộ RPC/paymaster/portal đều lấy từ env, không hardcode.
+- Ở runtime sử dụng SDK thật; test có thể mock hook `useWallet()`.
 
 ### Mục tiêu
 - Chuẩn hoá trải nghiệm cho 3 trạng thái người dùng (chưa có gì, có Passkey nhưng chưa có ví, đã có Passkey và đã có ví) thông qua `hasPasskey`, `hasWallet`.

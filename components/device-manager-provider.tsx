@@ -22,14 +22,14 @@ interface DeviceManagerProviderProps {
 export const DeviceManagerProvider = ({ children }: DeviceManagerProviderProps) => {
   const { hasWallet } = useWalletStore();
   
-  // Mock access token for development
-  // In production, this should come from your auth system
-  const accessToken = hasWallet ? 'demo-token' : null;
+  // Derive a per-wallet dev token so mỗi tài khoản có luồng thiết bị riêng
+  const pubkey = useWalletStore.getState().pubkey;
+  const accessToken = hasWallet && pubkey ? `dev-${pubkey}` : null;
 
   const deviceManager = useDeviceManager({
-    accessToken: accessToken || 'demo-token',
+    accessToken: accessToken || 'dev-anon',
     enabled: hasWallet, // Only register device when user has wallet
-    heartbeatInterval: 60000 // 60 seconds
+    heartbeatInterval: 120000 // 120 seconds
   });
 
   return (

@@ -45,9 +45,13 @@ export const formatTokenAmount = (amount: number, symbol: TokenSym): string => {
   return `${formatNumber(amount, decimals)} ${symbol}`;
 };
 
-export const formatPercentage = (value: number): string => {
-  const sign = value >= 0 ? '+' : '';
-  return `${sign}${value.toFixed(2)}%`;
+export const formatPercentage = (value: number | undefined | null): string => {
+  if (value === undefined || value === null || !isFinite(value as number)) {
+    return '0.00%';
+  }
+  const num = Number(value);
+  const sign = num >= 0 ? '+' : '';
+  return `${sign}${num.toFixed(2)}%`;
 };
 
 // Represents very small values without showing 0.00

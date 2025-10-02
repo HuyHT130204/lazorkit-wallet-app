@@ -35,12 +35,10 @@ export interface SwapTransaction {
   prioritizationFeeLamports?: number;
 }
 
-// RPC endpoints (use Helius devnet only to ensure stability)
+// RPC endpoint từ biến môi trường, mặc định devnet
+const ENV_RPC = process.env.NEXT_PUBLIC_LAZORKIT_RPC_URL || 'https://api.devnet.solana.com';
 const RPC_ENDPOINTS = {
-  devnet: 'https://devnet.helius-rpc.com/?api-key=3ad52cea-a8c4-41e2-8b01-22230620e995',
-  helius: 'https://devnet.helius-rpc.com/?api-key=3ad52cea-a8c4-41e2-8b01-22230620e995',
-  quicknode: 'https://devnet.helius-rpc.com/?api-key=3ad52cea-a8c4-41e2-8b01-22230620e995',
-  mainnet: 'https://api.mainnet-beta.solana.com',
+  env: ENV_RPC,
 } as const;
 
 // Common token addresses on Solana (Devnet)
@@ -79,14 +77,11 @@ export function getSymbolDecimals(symbol: string, jupToken?: JupiterToken): numb
 
 // Create connection instances
 export const connections = {
-  devnet: new Connection(RPC_ENDPOINTS.devnet, 'confirmed'),
-  helius: new Connection(RPC_ENDPOINTS.helius, 'confirmed'),
-  quicknode: new Connection(RPC_ENDPOINTS.quicknode, 'confirmed'),
-  mainnet: new Connection(RPC_ENDPOINTS.mainnet, 'confirmed'),
+  env: new Connection(RPC_ENDPOINTS.env, 'confirmed'),
 };
 
 // Default connection -> Helius devnet for stability
-export const defaultConnection = connections.helius;
+export const defaultConnection = connections.env;
 
 // Cache for token data
 const tokenCache = new Map<string, JupiterToken>();
@@ -241,15 +236,16 @@ export async function getSwapQuote(
       return null;
     }
 
-    const url = `https://quote-api.jup.ag/v6/quote?inputMint=${encodeURIComponent(inputMint)}&outputMint=${encodeURIComponent(outputMint)}&amount=${amount}&slippageBps=${slippageBps}`;
+    const backendBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+    const url = `${backendBase}/api/jupiter/quote?inputMint=${encodeURIComponent(inputMint)}&outputMint=${encodeURIComponent(outputMint)}&amount=${amount}&slippageBps=${slippageBps}`;
     
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
     const response = await fetch(url, {
-      headers: {
-        Accept: 'application/json',
-      },
-      // Add timeout
-      signal: AbortSignal.timeout(10000), // 10 second timeout
+      headers: { Accept: 'application/json' },
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
 
     if (!response.ok) {
       console.warn(`Jupiter API error: ${response.status} ${response.statusText}`);
@@ -315,10 +311,7 @@ export async function getSwapTransaction(
 }
 
 // Generate fake wallet addresses for demo
-export function generateFakeWalletAddress(): string {
-  const keypair = Keypair.generate();
-  return keypair.publicKey.toBase58();
-}
+// Removed fake address generator to avoid using random addresses in production
 
 // Get token balance from blockchain
 export async function getTokenBalance(

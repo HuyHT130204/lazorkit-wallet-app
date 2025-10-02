@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const { connectDB } = require('./src/db');
+const { startCronJob } = require('./src/utils/cron');
 require('dotenv').config({ path: '.env.local' });
 
 const app = express();
@@ -22,7 +23,11 @@ app.set('trust proxy', true);
 
 // Routes
 const devicesRouter = require('./src/routes/devices');
+const ordersRouter = require('./src/routes/orders');
+const jupiterRouter = require('./src/routes/jupiter');
 app.use('/api/devices', devicesRouter);
+app.use('/api/orders', ordersRouter);
+app.use('/api/jupiter', jupiterRouter);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -54,6 +59,7 @@ app.use((req, res) => {
 const startServer = async () => {
   try {
     await connectDB();
+    console.log('✅ Database connected successfully');
   } catch (error) {
     console.warn('⚠️  MongoDB not connected. Running in in-memory fallback mode for devices API.');
     // Do not exit; routes will use in-memory storage when DB is unavailable
@@ -63,6 +69,9 @@ const startServer = async () => {
     console.log(`🚀 API Server running on port ${PORT}`);
     console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
     console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
+    
+    // Start cron job for expired orders
+    startCronJob();
   });
 };
 

@@ -15,7 +15,7 @@ interface UseDeviceManagerOptions {
 export const useDeviceManager = ({ 
   accessToken, 
   enabled = true, 
-  heartbeatInterval = 60000 
+  heartbeatInterval = 120000 
 }: UseDeviceManagerOptions) => {
   const [isRegistered, setIsRegistered] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);

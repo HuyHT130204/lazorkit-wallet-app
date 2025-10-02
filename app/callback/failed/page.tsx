@@ -1,68 +1,143 @@
 'use client';
 
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CopyButton } from '@/components/ui/copy-button';
+import { formatCurrency } from '@/lib/utils/format';
+import { useWalletStore } from '@/lib/store/wallet';
 
 export default function FailedCallbackPage() {
   const search = useSearchParams();
   const router = useRouter();
   const reason = search.get('reason') || search.get('message') || 'Payment failed or canceled.';
   const orderId = search.get('orderId') || search.get('id') || search.get('ref') || '';
+  const wallet = search.get('wallet') || '';
 
   const details = useMemo(() => {
-    const amount = search.get('amount');
+    const amount = parseFloat(search.get('amount') || '0');
     const token = search.get('token');
-    const currency = search.get('currency');
+    const currency = (search.get('currency') as 'USD' | 'VND' | null) || 'USD';
     return { amount, token, currency };
   }, [search]);
 
+  // Nếu user quay về từ checkout thất bại: kiểm tra passkey đã có ví để tự về Home
+  useEffect(() => {
+    (async () => {
+      try {
+        const stored = typeof window !== 'undefined' ? localStorage.getItem('lazorkit-passkey-data') : null;
+        if (!stored) return;
+        const passkeyData = JSON.parse(stored);
+        const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+        const resp = await fetch(`${apiBase}/api/orders/check-wallet`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ passkeyData })
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data?.exists && data?.walletAddress) {
+            try {
+              const store = useWalletStore.getState();
+              store.setHasWallet?.(true);
+              store.setPubkey?.(data.walletAddress);
+            } catch {}
+            // Không auto redirect; người dùng chủ động bấm nút
+          }
+        }
+      } catch {}
+    })();
+  }, [router]);
+
   return (
-    <div className="container mx-auto px-4 py-6 max-w-md">
-      <div className="space-y-6">
-        <div className="text-center space-y-2">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
-            <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z" />
-            </svg>
+    <div className="min-h-screen bg-[#0a0a0f] relative overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(239,68,68,0.08),transparent_40%),radial-gradient(circle_at_80%_20%,rgba(244,63,94,0.06),transparent_40%)]" />
+      <div className="relative flex items-center justify-center p-4">
+        <div className="w-full max-w-md space-y-8">
+          {/* Failed Icon */}
+          <div className="flex flex-col items-center space-y-4">
+            <div className="w-20 h-20 rounded-2xl bg-red-500/10 border border-red-400/30 shadow-[0_0_40px_rgba(239,68,68,0.15)] backdrop-blur-sm flex items-center justify-center">
+              <svg className="w-10 h-10 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </div>
+            <div className="text-center space-y-1">
+              <h1 className="text-3xl font-semibold tracking-tight text-white">Payment Failed</h1>
+              <p className="text-sm text-gray-400">We couldn't process your payment. Please try again.</p>
+            </div>
           </div>
-          <h1 className="text-2xl font-bold">Payment Failed</h1>
-        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Details</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
+          {/* Transaction Details Card */}
+          <Card className="bg-[#0f1015]/80 backdrop-blur border-[#1e1e2e] shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_8px_30px_rgba(0,0,0,0.35)]">
+            <CardHeader className="border-b border-[#1e1e2e] pb-4">
+              <CardTitle className="text-base font-medium text-white">Transaction Details</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6 space-y-4">
             {orderId && (
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Order ID</span>
-                <span className="font-mono">{orderId}</span>
+              <div className="flex justify-between items-center py-3 border-b border-[#1e1e2e]">
+                <span className="text-sm text-gray-400">Order ID</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-sm text-white">{orderId}</span>
+                  <CopyButton text={orderId} />
+                </div>
               </div>
             )}
-            {details.amount && details.currency && (
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Amount</span>
-                <span>
-                  {details.amount} {details.currency}
-                </span>
-              </div>
-            )}
-            {details.token && (
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Token</span>
-                <span>{details.token}</span>
-              </div>
-            )}
-            <div className="pt-2 text-sm text-red-600 break-words">{reason}</div>
-          </CardContent>
-        </Card>
 
-        <Button className="w-full" onClick={() => router.push('/buy')}>Return to Buy</Button>
+            <div className="flex justify-between items-center py-3 border-b border-[#1e1e2e]">
+              <span className="text-sm text-gray-400">Amount</span>
+              <span className="text-base font-medium text-white">
+                {formatCurrency(details.amount || 0, details.currency as any)}
+              </span>
+            </div>
+
+            {details.token && (
+              <div className="flex justify-between items-center py-3 border-b border-[#1e1e2e]">
+                <span className="text-sm text-gray-400">Token</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-base font-medium text-white">
+                    {(details.amount || 0).toFixed(2)}
+                  </span>
+                  <span className="text-sm text-red-400 bg-red-500/10 px-2 py-0.5 rounded">
+                    {details.token}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {wallet && (
+              <div className="flex justify-between items-center py-3 border-b border-[#1e1e2e]">
+                <span className="text-sm text-gray-400">Wallet</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-sm text-white">{wallet.slice(0,8)}...{wallet.slice(-4)}</span>
+                  <CopyButton text={wallet} />
+                </div>
+              </div>
+            )}
+
+            {/* Error Message */}
+            <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20">
+              <div className="flex gap-3">
+                <div className="flex-shrink-0 mt-0.5">
+                  <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-red-300 mb-1">Error Details</h3>
+                  <p className="text-sm text-red-200 break-words">{reason}</p>
+                </div>
+              </div>
+            </div>
+            </CardContent>
+          </Card>
+
+          {/* Action Button */}
+          <Button className="w-full h-11 bg-white hover:bg-gray-100 text-black font-medium transition-colors" onClick={() => router.replace('/buy')}>
+            Return to App
+          </Button>
+        </div>
       </div>
     </div>
   );
 }
-
-

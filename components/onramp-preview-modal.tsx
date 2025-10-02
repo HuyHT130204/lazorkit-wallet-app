@@ -5,7 +5,7 @@ import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Card, CardContent } from './ui/card';
 import { Label } from './ui/label';
-import { Fiat, PaymentMethod, TokenSym } from '@/lib/store/wallet';
+import { Fiat, TokenSym } from '@/lib/store/wallet';
 import { formatCurrency } from '@/lib/utils/format';
 import { t } from '@/lib/i18n';
 
@@ -13,7 +13,6 @@ export interface OnRampPreviewData {
   fromCurrency: Fiat;
   toToken: TokenSym;
   amount: number; // USD-equivalent
-  paymentMethod: PaymentMethod;
 }
 
 interface OnRampPreviewModalProps {
@@ -80,13 +79,9 @@ export function OnRampPreviewModal({
             </CardContent>
           </Card>
 
+          {/* Đã bỏ hiển thị phương thức thanh toán – chỉ giữ chú thích nhà cung cấp */}
           <div className='text-xs text-muted-foreground'>
-            {data.paymentMethod === 'applepay'
-              ? 'Apple Pay'
-              : data.paymentMethod === 'vnpay'
-              ? 'VNPay QR'
-              : t('onRamp.card')}{' '}
-            • {t('onRamp.trustStripe')}
+            {t('onRamp.trustStripe')}
           </div>
 
           <Button

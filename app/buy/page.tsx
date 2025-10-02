@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { AppHeader } from '@/components/app-header';
 import { DrawerNav } from '@/components/drawer-nav';
 import { WalletBanner } from '@/components/wallet-banner';
+import { OnRampForm } from '@/components/onramp-form';
 import { UnifiedTradeForm } from '@/components/UnifiedTradeForm';
 import { DepositModal } from '@/components/deposit-modal';
 import ErrorBoundary from '@/components/error-boundary';

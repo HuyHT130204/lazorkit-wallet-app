@@ -47,12 +47,25 @@ export const WalletBanner = ({
   }, []);
 
   const totalBalance = useMemo(() => {
-    if (!tokens || tokens.length === 0) return 0;
-    return tokens.reduce((sum, tk) => {
+    console.log('WalletBanner: Current tokens array:', tokens);
+    console.log('WalletBanner: Tokens length:', tokens?.length);
+    
+    if (!tokens || tokens.length === 0) {
+      console.log('WalletBanner: No tokens found');
+      return 0;
+    }
+    console.log('WalletBanner: Calculating total balance from tokens:', tokens.map(t => ({ symbol: t.symbol, amount: t.amount, priceUsd: t.priceUsd })));
+    // If env TOKEN_MINT is set, prioritize that token's raw amount as USD 1:1
+    const priorityMint = process.env.NEXT_PUBLIC_TOKEN_MINT || process.env.TOKEN_MINT;
+    const sum = tokens.reduce((sum, tk) => {
       const j = tokenData.get(tk.symbol);
-      const price = j?.usdPrice ?? tk.priceUsd ?? 0;
-      return sum + tk.amount * price;
+      const price = j?.usdPrice ?? tk.priceUsd ?? 1;
+      const value = tk.amount * price;
+      console.log(`Token ${tk.symbol}: amount=${tk.amount}, price=${price}, value=${value}`);
+      return sum + value;
     }, 0);
+    console.log('WalletBanner: Total balance calculated:', sum);
+    return sum;
   }, [tokens, tokenData]);
 
   const displayBalance =

@@ -14,14 +14,14 @@ const authenticate = (req, res, next) => {
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
     
-    // For development, we'll create a mock user from the token
-    // In production, verify the JWT token properly
-    if (token === 'demo-token' || token === 'dev-token') {
-      // Mock user for development
-      req.user = { 
-        id: '507f1f77bcf86cd799439011', // Mock ObjectId
-        email: 'demo@lazorkit.com',
-        name: 'Demo User'
+    // For development: derive a stable pseudo user from any non-JWT token string
+    // This lets each wallet/account have isolated device list when token differs
+    if (!token.includes('.')) {
+      const hash = require('crypto').createHash('sha1').update(token).digest('hex').slice(0, 24);
+      req.user = {
+        id: hash, // deterministic pseudo ObjectId-like string (24 hex chars)
+        email: 'dev@lazorkit.com',
+        name: 'Dev User'
       };
       return next();
     }
@@ -32,15 +32,10 @@ const authenticate = (req, res, next) => {
       req.user = decoded;
       return next();
     } catch (jwtError) {
-      // If JWT verification fails, check if it's a simple string token for dev
-      if (token.length > 10) {
-        req.user = { 
-          id: '507f1f77bcf86cd799439011',
-          email: 'dev@lazorkit.com',
-          name: 'Dev User'
-        };
-        return next();
-      }
+      // If JWT verification fails, fallback to string token mapping as above
+      const hash = require('crypto').createHash('sha1').update(token).digest('hex').slice(0, 24);
+      req.user = { id: hash, email: 'dev@lazorkit.com', name: 'Dev User' };
+      return next();
       
       return res.status(401).json({ 
         error: 'Invalid token.' 

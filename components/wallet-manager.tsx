@@ -6,6 +6,7 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { useWalletStore } from '@/lib/store/wallet';
+import { useWallet } from '@/hooks/use-lazorkit-wallet';
 import { PublicKey } from '@solana/web3.js';
 import { useToast } from '@/hooks/use-toast';
 import { t } from '@/lib/i18n';
@@ -29,14 +30,8 @@ const formatCurrency = (amount: number, currency: string) => {
 };
 
 export const WalletManager = () => {
-  const { 
-    pubkey, 
-    tokens, 
-    fiat, 
-    generateNewWallet, 
-    refreshBalances, 
-    setPubkey 
-  } = useWalletStore();
+  const { pubkey, tokens, fiat, refreshBalances, setPubkey, logout, resetPasskey, resetWallet } = useWalletStore();
+  const { isConnected, isConnecting, smartWalletPubkey, connect, disconnect } = useWallet();
   
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -59,22 +54,17 @@ export const WalletManager = () => {
     }
   };
 
-  const handleGenerateWallet = () => {
+  const handleConnect = async () => {
     try {
-      if (!generateNewWallet || typeof generateNewWallet !== 'function') {
-        throw new Error('generateNewWallet function not available');
+      if (!connect || typeof connect !== 'function') {
+        throw new Error('Connect function not available');
       }
-      
-      generateNewWallet();
-      toast({
-        title: t('notifications.walletGenerated'),
-        description: t('notifications.walletGeneratedDesc'),
-      });
+      await connect();
     } catch (error) {
-      console.error('Generate wallet error:', error);
+      console.error('Connect error:', error);
       toast({
-        title: t('notifications.walletGeneratedFailed'),
-        description: t('notifications.walletGeneratedFailedDesc'),
+        title: 'Kết nối thất bại',
+        description: 'Vui lòng thử lại.',
         variant: 'destructive',
       });
     }
@@ -138,6 +128,57 @@ export const WalletManager = () => {
       toast({
         title: t('notifications.addressSetFailed'),
         description: t('notifications.addressSetFailedDesc'),
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleLogout = () => {
+    try {
+      logout();
+      toast({
+        title: 'Đăng xuất thành công',
+        description: 'Bạn đã đăng xuất khỏi ví.',
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast({
+        title: 'Lỗi đăng xuất',
+        description: 'Không thể đăng xuất. Vui lòng thử lại.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleResetPasskey = () => {
+    try {
+      resetPasskey();
+      toast({
+        title: 'Reset Passkey thành công',
+        description: 'Passkey đã được reset. Bạn có thể tạo passkey mới.',
+      });
+    } catch (error) {
+      console.error('Reset passkey error:', error);
+      toast({
+        title: 'Lỗi reset Passkey',
+        description: 'Không thể reset passkey. Vui lòng thử lại.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleResetWallet = () => {
+    try {
+      resetWallet();
+      toast({
+        title: 'Reset ví thành công',
+        description: 'Ví đã được reset hoàn toàn.',
+      });
+    } catch (error) {
+      console.error('Reset wallet error:', error);
+      toast({
+        title: 'Lỗi reset ví',
+        description: 'Không thể reset ví. Vui lòng thử lại.',
         variant: 'destructive',
       });
     }
@@ -214,16 +255,8 @@ export const WalletManager = () => {
             </div>
           </div>
 
-          {/* Action Buttons - Compact Grid */}
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              onClick={handleGenerateWallet}
-              className="h-9 text-xs font-medium"
-              variant="outline"
-            >
-              <Plus className="h-3.5 w-3.5 mr-1.5" />
-              {t('settings.walletManager.generateNew')}
-            </Button>
+          {/* Action Buttons - Compact Grid (SDK disabled → chỉ còn Refresh) */}
+          <div className="grid grid-cols-1 gap-2">
             <Button
               onClick={handleRefreshBalances}
               disabled={loading}
@@ -232,6 +265,24 @@ export const WalletManager = () => {
             >
               <RefreshCcw className={`h-3.5 w-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
               {t('settings.walletManager.refreshBalances')}
+            </Button>
+          </div>
+
+          {/* Reset Buttons */}
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              onClick={handleResetPasskey}
+              className="h-8 text-xs font-medium"
+              variant="outline"
+            >
+              Reset Passkey
+            </Button>
+            <Button
+              onClick={handleResetWallet}
+              className="h-8 text-xs font-medium"
+              variant="outline"
+            >
+              Reset Ví
             </Button>
           </div>
 

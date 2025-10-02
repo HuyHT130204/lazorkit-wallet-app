@@ -8,6 +8,8 @@ import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/toaster';
 import { DeviceManagerProvider } from '@/components/device-manager-provider';
 import { Suspense } from 'react';
+import { LazorkitRootProvider } from '@/components/lazorkit-provider';
+import { WalletSync } from '@/components/wallet-sync';
 
 export const metadata: Metadata = {
   title: 'LazorKit',
@@ -32,18 +34,30 @@ export default function RootLayout({
       <body
         className={`font-sans ${GeistSans.variable} ${GeistMono.variable} antialiased`}
       >
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function(){
+                if (typeof window !== 'undefined' && !window.global) { window.global = window; }
+              })();
+            `,
+          }}
+        />
         <Suspense fallback={null}>
-          <ThemeProvider
-            attribute='class'
-            defaultTheme='dark'
-            enableSystem={false}
-            disableTransitionOnChange
-          >
-            <DeviceManagerProvider>
-              {children}
-              <Toaster />
-            </DeviceManagerProvider>
-          </ThemeProvider>
+          <LazorkitRootProvider>
+            <ThemeProvider
+              attribute='class'
+              defaultTheme='dark'
+              enableSystem={false}
+              disableTransitionOnChange
+            >
+              <DeviceManagerProvider>
+                <WalletSync />
+                {children}
+                <Toaster />
+              </DeviceManagerProvider>
+            </ThemeProvider>
+          </LazorkitRootProvider>
         </Suspense>
         <Analytics />
       </body>

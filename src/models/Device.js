@@ -92,8 +92,10 @@ const deviceSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Compound index for efficient queries
+// Compound index for efficient queries (unique per user)
 deviceSchema.index({ userId: 1, deviceId: 1 }, { unique: true });
+// Non-unique index on deviceId alone to avoid duplicate key errors in some upserts
+deviceSchema.index({ deviceId: 1 }, { unique: false });
 
 // TTL index for cleanup of old devices (optional - 30 days)
 deviceSchema.index({ lastSeen: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });

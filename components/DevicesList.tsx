@@ -44,8 +44,9 @@ export const DevicesList = () => {
   const [coordinateCache, setCoordinateCache] = useState<Record<string, string>>({});
   const [expandedDevices, setExpandedDevices] = useState<Set<string>>(new Set());
 
-  // Mock access token for development
-  const accessToken = 'demo-token';
+  // Per-account dev token to isolate device list
+  const pubkey = typeof window !== 'undefined' ? (window as any).__lz_pubkey || '' : '';
+  const accessToken = pubkey ? `dev-${pubkey}` : 'dev-anon';
 
   useEffect(() => {
     setCurrentDeviceId(getOrCreateDeviceId());
