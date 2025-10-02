@@ -8,12 +8,39 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
+// CORS: allow origins from env ALLOWED_ORIGINS (comma separated), plus localhost in dev
+const parseAllowedOrigins = () => {
+  const list = (process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (process.env.NODE_ENV !== 'production') {
+    list.push('http://localhost:3000', 'http://127.0.0.1:3000');
+  }
+  return Array.from(new Set(list));
+};
+
+const allowedOrigins = parseAllowedOrigins();
+
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://yourdomain.com'] 
-    : ['http://localhost:3000', 'http://127.0.0.1:3000'],
-  credentials: true
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true); // allow server-to-server / curl
+    const ok = allowedOrigins.some((o) => {
+      if (o === origin) return true;
+      // support wildcard for vercel preview: https://*.vercel.app
+      if (o.startsWith('https://*.') && origin.endsWith(o.slice('https://*.'.length))) return true;
+      return false;
+    });
+    callback(ok ? null : new Error('CORS not allowed'), ok);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  maxAge: 86400,
 }));
+
+// Handle preflight
+app.options('*', cors());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
