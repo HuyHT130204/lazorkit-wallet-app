@@ -39,8 +39,8 @@ app.use(cors({
   maxAge: 86400,
 }));
 
-// Handle preflight (Express 5 + path-to-regexp v8 requires named catch-all)
-app.options('/:path(*)', cors());
+// Handle preflight (Express 5 + path-to-regexp v8): use named regexp group
+app.options('/:path(.*)', cors());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
