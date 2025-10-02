@@ -39,8 +39,8 @@ app.use(cors({
   maxAge: 86400,
 }));
 
-// Handle preflight
-app.options('*', cors());
+// Handle preflight (Express 5 + path-to-regexp v8 requires a named pattern)
+app.options('/(.*)', cors());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
