@@ -21,8 +21,8 @@ importers:
         specifier: ^4.0.0-beta.30
         version: 4.0.0-beta.3-fbed36(@saberhq/solana-contrib@1.15.0(@solana/web3.js@1.98.4(bufferutil@4.0.9)(typescript@5.0.2)(utf-8-validate@5.0.10))(bn.js@5.2.1))(@saberhq/token-utils@1.15.0(@solana/web3.js@1.98.4(bufferutil@4.0.9)(typescript@5.0.2)(utf-8-validate@5.0.10))(bn.js@5.2.1)(bufferutil@4.0.9)(jsbi@4.3.0)(typescript@5.0.2)(utf-8-validate@5.0.10))(@solana/buffer-layout@4.0.1)(@solana/web3.js@1.98.4(bufferutil@4.0.9)(typescript@5.0.2)(utf-8-validate@5.0.10))(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.0.2)(utf-8-validate@5.0.10)
       '@lazorkit/wallet':
-        specifier: ^1.6.6
-        version: 1.6.6(@types/react@19.2.0)(bufferutil@4.0.9)(react-dom@18.0.0(react@18.0.0))(react@18.0.0)(typescript@5.0.2)(use-sync-external-store@1.5.0(react@18.0.0))(utf-8-validate@5.0.10)
+        specifier: ^1.6.7
+        version: 1.6.7(@types/react@19.2.0)(bufferutil@4.0.9)(react-dom@18.0.0(react@18.0.0))(react@18.0.0)(typescript@5.0.2)(use-sync-external-store@1.5.0(react@18.0.0))(utf-8-validate@5.0.10)
       '@radix-ui/react-accordion':
         specifier: 1.2.2
         version: 1.2.2(@types/react-dom@19.2.0(@types/react@19.2.0))(@types/react@19.2.0)(react-dom@18.0.0(react@18.0.0))(react@18.0.0)
@@ -828,8 +828,8 @@ packages:
   '@jup-ag/whirlpools-sdk@0.7.2':
     resolution: {integrity: sha512-q3QPZ4QCj5s9eaY000jmIPiaFVCuJ/cYAxdzR+0gEeDCgrcBl3eJsxvaIEnyElM6x2r6/lc+yhjJMP0kfrUYxQ==}
 
-  '@lazorkit/wallet@1.6.6':
-    resolution: {integrity: sha512-mxcQhi/udXOmHAdkTeRJ2spjdfDlMMHrOpHmVezcnwFTFEJwJ8/DBbtM2azXobLqQzJBy8PaXukAteahCN8b0Q==}
+  '@lazorkit/wallet@1.6.7':
+    resolution: {integrity: sha512-11Jlj8/LiqIEaX1rXLLK/kDZ9f/NzaaLz9gDhswrJ8AESBEqJZcik87XGtK27mvPv/DaQzu1yEkGdclOMK9sjQ==}
     peerDependencies:
       react: ^18.3.1 || ^19.0.0
       react-dom: ^18.3.1 || ^19.0.0
@@ -5761,7 +5761,7 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@lazorkit/wallet@1.6.6(@types/react@19.2.0)(bufferutil@4.0.9)(react-dom@18.0.0(react@18.0.0))(react@18.0.0)(typescript@5.0.2)(use-sync-external-store@1.5.0(react@18.0.0))(utf-8-validate@5.0.10)':
+  '@lazorkit/wallet@1.6.7(@types/react@19.2.0)(bufferutil@4.0.9)(react-dom@18.0.0(react@18.0.0))(react@18.0.0)(typescript@5.0.2)(use-sync-external-store@1.5.0(react@18.0.0))(utf-8-validate@5.0.10)':
     dependencies:
       '@coral-xyz/anchor': 0.31.1(bufferutil@4.0.9)(typescript@5.0.2)(utf-8-validate@5.0.10)
       '@solana/web3.js': 1.98.4(bufferutil@4.0.9)(typescript@5.0.2)(utf-8-validate@5.0.10)
