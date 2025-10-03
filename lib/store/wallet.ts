@@ -697,6 +697,18 @@ export const useWalletStore = create<WalletState>()(
             tokens: [],
             activity: []
           });
+          
+          // Xóa passkeyData khỏi localStorage để đảm bảo đăng xuất hoàn toàn
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.removeItem('lazorkit-passkey-data');
+              localStorage.removeItem('lz_last_ref');
+              console.log('✓ Cleared passkeyData from localStorage');
+            } catch (e) {
+              console.warn('Failed to clear localStorage:', e);
+            }
+          }
+          
           console.log('✓ User logged out successfully');
           // Redirect to /buy after logout
           if (typeof window !== 'undefined') {
@@ -707,6 +719,18 @@ export const useWalletStore = create<WalletState>()(
         resetPasskey: () => {
           console.log('Resetting passkey...');
           set({ hasPasskey: false });
+          
+          // Xóa passkeyData khỏi localStorage khi reset passkey
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.removeItem('lazorkit-passkey-data');
+              localStorage.removeItem('lz_last_ref');
+              console.log('✓ Cleared passkeyData from localStorage');
+            } catch (e) {
+              console.warn('Failed to clear localStorage:', e);
+            }
+          }
+          
           console.log('✓ Passkey reset successfully');
         },
 
@@ -719,6 +743,18 @@ export const useWalletStore = create<WalletState>()(
             tokens: [],
             activity: []
           });
+          
+          // Xóa passkeyData khỏi localStorage khi reset wallet
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.removeItem('lazorkit-passkey-data');
+              localStorage.removeItem('lz_last_ref');
+              console.log('✓ Cleared passkeyData from localStorage');
+            } catch (e) {
+              console.warn('Failed to clear localStorage:', e);
+            }
+          }
+          
           console.log('✓ Wallet reset successfully');
         },
       };
