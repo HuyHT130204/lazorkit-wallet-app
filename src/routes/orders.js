@@ -202,6 +202,7 @@ router.post('/callback/success', async (req, res, next) => {
         if (providedSmartWallet && await accountExistsOnChain(providedSmartWallet)) {
           console.log('✅ Reuse provided smartWalletAddress (on-chain exists):', providedSmartWallet);
           resolvedWallet = providedSmartWallet;
+          finalWallet = providedSmartWallet; // Cập nhật finalWallet ngay lập tức
           // Persist mapping for future
           try {
             await PasskeyWallet.updateOne(
@@ -213,7 +214,7 @@ router.post('/callback/success', async (req, res, next) => {
               },
               {
                 $setOnInsert: { credentialId: currentCredentialId || null, publicKey: currentPublicKey || null, meta: effectivePasskey },
-                $set: { walletAddress: finalWallet, smartWalletId: effectivePasskey.smartWalletId }
+                $set: { walletAddress: providedSmartWallet, smartWalletId: effectivePasskey.smartWalletId }
               },
               { upsert: true }
             );
@@ -232,11 +233,12 @@ router.post('/callback/success', async (req, res, next) => {
           if (mapped && mapped.walletAddress) {
             console.log('✅ PasskeyWallet map hit:', mapped.walletAddress);
             resolvedWallet = mapped.walletAddress;
+            finalWallet = mapped.walletAddress; // Cập nhật finalWallet ngay lập tức
           }
         }
 
         // Method C: Find by exact credentialId match within Orders (fallback)
-        if (currentCredentialId) {
+        if (!finalWallet && currentCredentialId) {
           existingOrder = await Order.findOne({
             'passkeyData.credentialId': currentCredentialId,
             status: 'success',
@@ -246,11 +248,12 @@ router.post('/callback/success', async (req, res, next) => {
           if (existingOrder) {
             console.log('✅ Found existing wallet by credentialId:', existingOrder.walletAddress);
             resolvedWallet = existingOrder.walletAddress;
+            finalWallet = existingOrder.walletAddress; // Cập nhật finalWallet ngay lập tức
           }
         }
         
         // Method D: If no credentialId match, try publicKey match
-        if (!existingOrder && currentPublicKey) {
+        if (!finalWallet && !existingOrder && currentPublicKey) {
           existingOrder = await Order.findOne({
             $or: [
               { 'passkeyData.publicKey': currentPublicKey },
@@ -263,11 +266,12 @@ router.post('/callback/success', async (req, res, next) => {
           if (existingOrder) {
             console.log('✅ Found existing wallet by publicKey:', existingOrder.walletAddress);
             resolvedWallet = existingOrder.walletAddress;
+            finalWallet = existingOrder.walletAddress; // Cập nhật finalWallet ngay lập tức
           }
         }
         
         // Method E: If still no match, check for smartwalletAddress (without on-chain verify)
-        if (!existingOrder && effectivePasskey.smartWalletAddress) {
+        if (!finalWallet && !existingOrder && effectivePasskey.smartWalletAddress) {
           existingOrder = await Order.findOne({
             $or: [
               { walletAddress: effectivePasskey.smartWalletAddress },
@@ -279,14 +283,18 @@ router.post('/callback/success', async (req, res, next) => {
           if (existingOrder) {
             console.log('✅ Found existing wallet by smartWalletAddress:', existingOrder.walletAddress);
             resolvedWallet = existingOrder.walletAddress;
+            finalWallet = existingOrder.walletAddress; // Cập nhật finalWallet ngay lập tức
           }
         }
 
-        // Prefer resolved wallet from checks ALWAYS, and lock mapping to it
-        if (!finalWallet && resolvedWallet) {
-          console.log('🔄 Reusing existing wallet for passkey:', resolvedWallet);
-          finalWallet = resolvedWallet;
-          // Ensure mapping points to this wallet
+        // Log final wallet decision
+        if (finalWallet) {
+          console.log('✅ Final wallet decision:', finalWallet);
+        }
+
+        // Ensure mapping points to resolved wallet if we found one
+        if (finalWallet && resolvedWallet) {
+          console.log('🔄 Ensuring mapping points to resolved wallet:', resolvedWallet);
           try {
             await PasskeyWallet.updateOne(
               {
@@ -306,6 +314,7 @@ router.post('/callback/success', async (req, res, next) => {
         // Only create new wallet if after all checks we still don't have any wallet
         if (!finalWallet && !resolvedWallet) {
           console.log('🆕 No existing wallet found, creating new wallet for passkey');
+          console.log('🔍 Final check - finalWallet:', finalWallet, 'resolvedWallet:', resolvedWallet);
           const created = await createSmartWalletOnly(effectivePasskey);
           finalWallet = created?.address || created?.smartWalletAddress || created?.pubkey || null;
 

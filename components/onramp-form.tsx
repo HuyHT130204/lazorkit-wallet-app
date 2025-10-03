@@ -616,8 +616,22 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
 
             // If user has no passkey yet, create one via Portal (client) and send to backend
             let passkeyData: any = undefined;
+            // Kiểm tra xem đã có passkeyData cũ chưa trước khi tạo mới
+            let existingPasskeyData = null;
+            try {
+              const storedPasskey = localStorage.getItem('lazorkit-passkey-data');
+              if (storedPasskey) {
+                existingPasskeyData = JSON.parse(storedPasskey);
+                console.log('🔍 Found existing passkeyData in localStorage:', existingPasskeyData);
+              }
+            } catch (e) {
+              console.warn('Failed to parse stored passkey data:', e);
+            }
+
             const hasPasskey = Boolean((wallet as any)?.passkeyPubkey || (wallet as any)?.account?.passkeyPubkey || useWalletStore.getState().hasPasskey);
-            if (!hasPasskey) {
+            
+            // Chỉ tạo passkeyData mới nếu chưa có hoặc không có passkey
+            if (!hasPasskey && !existingPasskeyData) {
               if (!(wallet?.createPasskeyOnly || wallet?.connectPasskey)) {
                 // LazorKit build without createPasskeyOnly → skip passkey creation and let backend handle wallet creation later
                 console.warn('createPasskeyOnly not available; proceeding without passkey data');
@@ -647,6 +661,10 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
                 throw new Error(reason);
               }
               }
+            } else if (existingPasskeyData) {
+              // Sử dụng passkeyData cũ thay vì tạo mới
+              passkeyData = existingPasskeyData;
+              console.log('♻️ Reusing existing passkeyData instead of creating new one');
             }
 
             // If đã có passkeyData (mới tạo hoặc lấy từ localStorage), kiểm tra ví trước khi tạo order
@@ -662,11 +680,21 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
                 if (resp.ok) {
                   const data = await resp.json();
                   if (data?.exists && data?.walletAddress) {
-                    // Có ví sẵn → cập nhật store để quá trình thanh toán tiếp tục dùng ví này
+                    // Có ví sẵn → cập nhật store và passkeyData để sử dụng ví cũ
                     try {
                       const store = useWalletStore.getState();
                       store.setHasWallet?.(true);
                       store.setPubkey?.(data.walletAddress);
+                      
+                      // Cập nhật passkeyData để sử dụng wallet cũ thay vì tạo mới
+                      if (data.passkeyData) {
+                        passkeyData = {
+                          ...passkeyData,
+                          smartWalletAddress: data.walletAddress,
+                          ...data.passkeyData
+                        };
+                        console.log('🔄 Updated passkeyData to use existing wallet:', data.walletAddress);
+                      }
                     } catch {}
                     // Không return; tiếp tục tạo order để mua token
                   }

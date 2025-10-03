@@ -43,6 +43,7 @@ export default function SuccessCallbackPage() {
   const searchParams = useSearchParams();
   const { hasWallet, setHasWallet, setPubkey, onrampFake, setTokenAmount, refreshBalances } = useWalletStore() as any;
   const [resolvedWallet, setResolvedWallet] = useState<string | null>(null);
+  const [isLoadingWallet, setIsLoadingWallet] = useState<boolean>(true);
 
   const orderId = searchParams.get('orderId') || searchParams.get('id') || searchParams.get('order_id') || searchParams.get('ref');
   const amount = parseFloat(searchParams.get('amount') || searchParams.get('total') || '0');
@@ -89,6 +90,7 @@ export default function SuccessCallbackPage() {
         }
         if (w) {
           setResolvedWallet(w);
+          setIsLoadingWallet(false); // Wallet đã được resolve
           try { setHasWallet(true); } catch {}
           try { setPubkey(w); } catch {}
           // Xóa cờ pending khi đã có ví (đồng nghĩa BE success)
@@ -106,6 +108,9 @@ export default function SuccessCallbackPage() {
           } catch (error) {
             console.error('Failed to refresh balances:', error);
           }
+        } else {
+          // Nếu sau khi poll mà vẫn không có wallet, dừng loading
+          setIsLoadingWallet(false);
         }
         // Nếu chưa có ví, kiểm tra trạng thái order để xoá cờ nếu đã success
         if (!w && orderId) {
@@ -182,8 +187,19 @@ export default function SuccessCallbackPage() {
           </Card>
 
           {/* Actions */}
-          <Button className="w-full h-11 bg-white hover:bg-gray-100 text-black font-medium transition-colors" onClick={() => router.replace('/buy')}>
-            Return to App
+          <Button 
+            className="w-full h-11 bg-white hover:bg-gray-100 text-black font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
+            onClick={() => router.replace('/buy')}
+            disabled={isLoadingWallet}
+          >
+            {isLoadingWallet ? (
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 border-2 border-gray-300 border-t-black rounded-full animate-spin"></div>
+                Loading wallet...
+              </div>
+            ) : (
+              'Return to App'
+            )}
           </Button>
         </div>
       </div>
