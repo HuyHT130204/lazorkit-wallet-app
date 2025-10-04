@@ -75,6 +75,7 @@ export interface WalletState {
   swapFake: (fromToken: TokenSym, toToken: TokenSym, amount: number) => void;
   swapReal: (fromToken: TokenSym, toToken: TokenSym, amount: number) => Promise<boolean>;
   sendFake: (token: TokenSym, amount: number, recipient: string) => void;
+  sendReal: (token: TokenSym, amount: number, recipient: string, wallet: any) => Promise<boolean>;
   depositFake: (token: TokenSym, amount: number) => void;
   addActivity: (activity: Activity) => void;
   resetDemoData: () => void;
@@ -323,6 +324,431 @@ export const useWalletStore = create<WalletState>()(
           };
 
           set({ activity: [newActivity, ...state.activity] });
+        },
+
+        sendReal: async (token: TokenSym, amount: number, recipient: string, wallet: any) => {
+          const state = get();
+          if (!state.pubkey) {
+            console.warn('No pubkey available for sendReal');
+            return false;
+          }
+
+          // Inject JWT token into wallet instance if available
+          const jwtToken = typeof window !== 'undefined' ? localStorage.getItem('lazorkit-jwt-token') : null;
+          if (jwtToken && wallet && typeof wallet === 'object') {
+            console.log('🔧 Injecting JWT token into wallet for sendReal');
+            (wallet as any).authToken = jwtToken;
+            (wallet as any).jwtToken = jwtToken;
+            (wallet as any).token = jwtToken;
+            
+            if (wallet.account && typeof wallet.account === 'object') {
+              (wallet.account as any).authToken = jwtToken;
+              (wallet.account as any).jwtToken = jwtToken;
+              (wallet.account as any).token = jwtToken;
+            }
+          }
+
+          if (!token || !amount || amount <= 0 || !recipient) {
+            console.warn('Invalid send parameters:', { token, amount, recipient });
+            return false;
+          }
+
+          try {
+            // Get passkeyData from localStorage (same as buy workflow)
+            let passkeyData = null;
+            try {
+              const storedPasskey = localStorage.getItem('lazorkit-passkey-data');
+              if (storedPasskey) {
+                passkeyData = JSON.parse(storedPasskey);
+                console.log('🔍 Found passkeyData in localStorage:', passkeyData);
+              }
+            } catch (e) {
+              console.warn('Failed to parse stored passkey data:', e);
+            }
+
+            if (!passkeyData) {
+              console.error('No passkeyData found. Please complete wallet setup first.');
+              return false;
+            }
+
+            // Check if wallet is connected
+            if (!wallet || !wallet.isConnected) {
+              console.error('Wallet not connected. Please connect your wallet first.');
+              return false;
+            }
+
+            // Try to reconnect wallet if needed
+            if (wallet.isConnected && !wallet.smartWalletPubkey && wallet.connect) {
+              console.log('🔧 Wallet connected but no smart wallet pubkey, trying to reconnect...');
+              try {
+                await wallet.connect();
+                console.log('✅ Wallet reconnected successfully');
+              } catch (error) {
+                console.warn('⚠️ Failed to reconnect wallet:', error);
+              }
+            }
+
+            if (!wallet.signAndSendTransaction) {
+              console.error('LazorKit wallet signAndSendTransaction not available');
+              return false;
+            }
+
+            // Debug wallet state
+            console.log('🔍 Wallet debug info:', {
+              isConnected: wallet.isConnected,
+              hasSignAndSendTransaction: !!wallet.signAndSendTransaction,
+              smartWalletPubkey: wallet.smartWalletPubkey,
+              account: wallet.account,
+              passkeyPubkey: wallet.passkeyPubkey,
+              walletKeys: Object.keys(wallet)
+            });
+
+            // Check if smart wallet exists and is properly set up
+            console.log('🔍 Wallet account details:', {
+              hasAccount: !!wallet.account,
+              accountKeys: wallet.account ? Object.keys(wallet.account) : 'no account',
+              smartWallet: wallet.account?.smartWallet,
+              isConnected: wallet.isConnected,
+              smartWalletPubkey: wallet.smartWalletPubkey,
+              allWalletKeys: Object.keys(wallet)
+            });
+
+            // Try to find smart wallet address from different possible locations
+            let smartWalletAddress = wallet.smartWalletPubkey;
+            
+            if (!smartWalletAddress && wallet.account) {
+              // Try different possible keys in account
+              smartWalletAddress = wallet.account.smartWallet || 
+                                 wallet.account.smartWalletAddress || 
+                                 wallet.account.walletAddress ||
+                                 wallet.account.address;
+            }
+            
+            if (!smartWalletAddress) {
+              console.error('❌ Smart wallet address not found in any expected location');
+              console.error('❌ Available wallet keys:', Object.keys(wallet));
+              if (wallet.account) {
+                console.error('❌ Available account keys:', Object.keys(wallet.account));
+              }
+              return false;
+            }
+            
+            console.log('✅ Found smart wallet address:', smartWalletAddress);
+
+            // Smart wallet should already exist since user can access the main page
+            console.log('✅ Using existing smart wallet for transaction');
+            
+            // If still no smart wallet address, try to create it using passkeyData
+            if (!smartWalletAddress && wallet.createSmartWallet && passkeyData) {
+              console.log('🔧 No smart wallet address found, trying to create one...');
+              try {
+                const result = await wallet.createSmartWallet(passkeyData);
+                console.log('✅ Smart wallet created:', result);
+                
+                // Update smartWalletAddress
+                smartWalletAddress = result?.smartWalletAddress || wallet.smartWalletPubkey;
+                
+                if (!smartWalletAddress) {
+                  console.error('❌ Failed to get smart wallet address after creation');
+                  return false;
+                }
+              } catch (error) {
+                console.error('❌ Failed to create smart wallet:', error);
+                return false;
+              }
+            }
+
+            // Import required modules dynamically
+            const { PublicKey, SystemProgram, LAMPORTS_PER_SOL } = await import('@solana/web3.js');
+            const splToken = require('@solana/spl-token');
+            
+            // Use the functions from the imported module
+            const getAssociatedTokenAddress = splToken.getAssociatedTokenAddress;
+            const createAssociatedTokenAccountInstruction = splToken.createAssociatedTokenAccountInstruction;
+            const createTransferInstruction = splToken.createTransferInstruction;
+            const getAccount = splToken.getAccount;
+
+            // Get token mint address and decimals
+            const tokenMint = TOKEN_ADDRESSES[token as keyof typeof TOKEN_ADDRESSES];
+            if (!tokenMint) {
+              console.error('Unknown token mint for:', token);
+              return false;
+            }
+
+            const decimals = TOKEN_DECIMALS[token as keyof typeof TOKEN_DECIMALS] ?? 9;
+            const rawAmount = Math.round(amount * Math.pow(10, decimals));
+
+            console.log('🚀 Starting real send transaction:', {
+              token,
+              amount,
+              rawAmount,
+              recipient,
+              tokenMint,
+              decimals,
+              walletConnected: wallet.isConnected,
+              smartWalletPubkey: wallet.smartWalletPubkey,
+              walletKeys: Object.keys(wallet),
+              passkeyDataKeys: passkeyData ? Object.keys(passkeyData) : null
+            });
+
+            const recipientPubkey = new PublicKey(recipient);
+            const tokenMintPubkey = new PublicKey(tokenMint);
+            
+            // Use smart wallet pubkey as sender, not the passkey pubkey
+            const senderPubkey = smartWalletAddress || new PublicKey(state.pubkey);
+            
+            console.log('🔍 Sender pubkey analysis:', {
+              walletSmartWalletPubkey: wallet.smartWalletPubkey?.toString(),
+              statePubkey: state.pubkey,
+              finalSenderPubkey: senderPubkey.toString(),
+              isSmartWallet: !!wallet.smartWalletPubkey
+            });
+
+            console.log('🔍 Transaction details:', {
+              sender: senderPubkey.toString(),
+              recipient: recipientPubkey.toString(),
+              tokenMint: tokenMintPubkey.toString(),
+              rawAmount,
+              token
+            });
+
+            let instructions = [];
+
+            if (token === 'SOL') {
+              // For SOL, use SystemProgram.transfer
+              const transferInstruction = SystemProgram.transfer({
+                fromPubkey: senderPubkey,
+                toPubkey: recipientPubkey,
+                lamports: rawAmount,
+              });
+              instructions.push(transferInstruction);
+              console.log('✅ Created SOL transfer instruction');
+              console.log('🔍 SOL instruction details:', {
+                programId: transferInstruction.programId.toString(),
+                keys: transferInstruction.keys.map(k => ({
+                  pubkey: k.pubkey.toString(),
+                  isSigner: k.isSigner,
+                  isWritable: k.isWritable
+                })),
+                data: transferInstruction.data.length
+              });
+            } else {
+              // For SPL tokens, create ATA and transfer
+              const senderATA = await getAssociatedTokenAddress(tokenMintPubkey, senderPubkey, true);
+              const recipientATA = await getAssociatedTokenAddress(tokenMintPubkey, recipientPubkey, true);
+
+              console.log('🔍 ATA addresses:', {
+                senderATA: senderATA.toString(),
+                recipientATA: recipientATA.toString()
+              });
+
+              // Check if recipient ATA exists, if not create it
+              try {
+                await getAccount(defaultConnection, recipientATA);
+                console.log('✅ Recipient ATA already exists');
+              } catch (error) {
+                // ATA doesn't exist, create it
+                console.log('🔧 Creating recipient ATA...');
+                const createATAInstruction = createAssociatedTokenAccountInstruction(
+                  senderPubkey, // payer
+                  recipientATA, // ata
+                  recipientPubkey, // owner
+                  tokenMintPubkey // mint
+                );
+                instructions.push(createATAInstruction);
+                console.log('✅ Created ATA creation instruction');
+              }
+
+              // Create transfer instruction
+              const transferInstruction = createTransferInstruction(
+                senderATA, // source
+                recipientATA, // destination
+                senderPubkey, // owner
+                rawAmount // amount
+              );
+              instructions.push(transferInstruction);
+              console.log('✅ Created SPL token transfer instruction');
+              
+              // Debug all instructions for SPL tokens
+              console.log('🔍 All SPL instructions details:');
+              instructions.forEach((ix, index) => {
+                console.log(`  Instruction ${index + 1}:`, {
+                  programId: ix.programId.toString(),
+                  keys: ix.keys.map((k: any) => ({
+                    pubkey: k.pubkey.toString(),
+                    isSigner: k.isSigner,
+                    isWritable: k.isWritable
+                  })),
+                  data: ix.data.length
+                });
+              });
+            }
+
+            console.log('📝 Created instructions:', instructions.length);
+            console.log('📝 Instructions details:', instructions.map(ix => ({
+              programId: ix.programId?.toString(),
+              keys: ix.keys?.length,
+              data: ix.data?.length
+            })));
+
+            // Sign and send transaction using LazorKit
+            // LazorKit SDK supports multiple instructions - pass the array directly
+            console.log('🚀 Calling wallet.signAndSendTransaction with instructions:', instructions);
+            console.log('🚀 Wallet object keys:', Object.keys(wallet));
+            console.log('🚀 Wallet methods:', {
+              signAndSendTransaction: typeof wallet.signAndSendTransaction,
+              signTransaction: typeof wallet.signTransaction,
+              connect: typeof wallet.connect,
+              disconnect: typeof wallet.disconnect
+            });
+            console.log('🚀 Wallet smartWalletPubkey:', wallet.smartWalletPubkey?.toString());
+            console.log('🚀 Wallet account:', wallet.account);
+            console.log('🚀 Environment URLs:', {
+              rpcUrl: process.env.NEXT_PUBLIC_LAZORKIT_RPC_URL,
+              paymasterUrl: process.env.NEXT_PUBLIC_LAZORKIT_PAYMASTER_URL,
+              portalUrl: process.env.NEXT_PUBLIC_LAZORKIT_PORTAL_URL
+            });
+            
+            // Check JWT token availability
+            const jwtToken = typeof window !== 'undefined' ? localStorage.getItem('lazorkit-jwt-token') : null;
+            console.log('🔑 JWT token info:', {
+              hasJwtToken: !!jwtToken,
+              jwtTokenLength: jwtToken?.length || 0,
+              globalJwtToken: !!(typeof window !== 'undefined' && (window as any).__lazorkit_jwt_token),
+              walletKeys: Object.keys(wallet).filter(key => key.includes('auth') || key.includes('token'))
+            });
+            
+            // Use original instructions without modification
+            // LazorKit SDK should handle signer information automatically
+            console.log('🚀 Using original instructions:', instructions);
+            
+            // LazorKit SDK supports multiple instructions - use them directly
+            let signature;
+            
+            // Ensure wallet is properly connected before signing
+            console.log('🔧 Ensuring wallet is properly connected...');
+            
+            // Try to connect wallet if not properly connected
+            if (!wallet.smartWalletPubkey) {
+              console.log('🔧 No smart wallet pubkey found, trying to connect...');
+              
+              // Try reconnect first if available
+              if (wallet.reconnect) {
+                console.log('🔧 Trying reconnect...');
+                try {
+                  const reconnectResult = await wallet.reconnect();
+                  console.log('✅ Wallet reconnected:', reconnectResult);
+                } catch (reconnectError) {
+                  console.warn('⚠️ Failed to reconnect wallet:', reconnectError);
+                }
+              }
+              
+              // If still no smart wallet, try connect
+              if (!wallet.smartWalletPubkey && wallet.connect) {
+                console.log('🔧 Trying connect...');
+                try {
+                  const connectResult = await wallet.connect();
+                  console.log('✅ Wallet connected:', connectResult);
+                } catch (connectError) {
+                  console.warn('⚠️ Failed to connect wallet:', connectError);
+                }
+              }
+            }
+
+            // Try signAndSendTransaction with original instructions
+            try {
+              // First, let's try with a very simple approach
+              console.log('🧪 Testing with instructions array...');
+              console.log('🧪 Instructions count:', instructions.length);
+              console.log('🧪 First instruction keys:', instructions[0]?.keys?.length || 'no keys');
+              console.log('🧪 Wallet state before signing:', {
+                isConnected: wallet.isConnected,
+                smartWalletPubkey: wallet.smartWalletPubkey,
+                hasSignAndSendTransaction: !!wallet.signAndSendTransaction
+              });
+              
+              // Try to ensure the first instruction has proper signer
+              if (instructions[0]?.keys) {
+                const hasSigner = instructions[0].keys.some((key: any) => key.isSigner);
+                console.log('🧪 First instruction has signer:', hasSigner);
+                
+                if (!hasSigner) {
+                  console.warn('⚠️ First instruction has no signer, this might cause issues');
+                }
+              }
+              
+              // Final check before signing
+              if (!wallet.smartWalletPubkey) {
+                console.error('❌ Still no smart wallet pubkey after connection attempts');
+                throw new Error('Smart wallet not available for signing');
+              }
+              
+              signature = await wallet.signAndSendTransaction(instructions);
+              console.log('✅ Transaction successful');
+            } catch (error: any) {
+              console.error('❌ signAndSendTransaction failed:', error);
+              console.error('❌ Error details:', {
+                message: error?.message,
+                stack: error?.stack,
+                name: error?.name,
+                token: token,
+                instructionsCount: instructions.length,
+                walletState: {
+                  isConnected: wallet.isConnected,
+                  smartWalletPubkey: wallet.smartWalletPubkey,
+                  hasSignAndSendTransaction: !!wallet.signAndSendTransaction
+                }
+              });
+              
+              // Check if it's a CORS or network error
+              if (error?.message?.includes('Failed to fetch') || error?.message?.includes('CORS')) {
+                console.error('🚨 CORS or Network Error detected. This is likely due to paymaster service CORS policy.');
+                console.error('🚨 Solutions:');
+                console.error('   1. Configure CORS on paymaster service');
+                console.error('   2. Use proxy server (already implemented)');
+                console.error('   3. Update .env.local to use proxy: NEXT_PUBLIC_LAZORKIT_PAYMASTER_URL=/api/paymaster');
+              }
+              
+              throw error;
+            }
+            
+            if (!signature) {
+              console.error('Transaction failed - no signature returned');
+              return false;
+            }
+
+            console.log('✅ Transaction sent successfully:', signature);
+
+            // Update local state
+            const tokenIndex = state.tokens.findIndex((t) => t.symbol === token);
+            if (tokenIndex >= 0) {
+              const newTokens = [...state.tokens];
+              newTokens[tokenIndex] = {
+                ...newTokens[tokenIndex],
+                amount: newTokens[tokenIndex].amount - amount,
+              };
+              set({ tokens: newTokens });
+            }
+
+            // Add activity
+            const newActivity: Activity = {
+              id: Date.now().toString(),
+              kind: 'send',
+              ts: new Date().toISOString(),
+              summary: `Sent ${amount} ${token} to ${recipient.slice(0, 4)}...${recipient.slice(-4)}`,
+              amount,
+              token,
+              counterparty: recipient,
+              status: 'Success'
+            } as any;
+
+            set({ activity: [newActivity, ...state.activity] });
+
+            return true;
+          } catch (error) {
+            console.error('❌ Error in sendReal:', error);
+            return false;
+          }
         },
 
         depositFake: (token, amount) => {

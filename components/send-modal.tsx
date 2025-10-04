@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from './ui/select';
 import { useWalletStore, TokenSym } from '@/lib/store/wallet';
+import { useWallet } from '@/hooks/use-lazorkit-wallet';
 import { formatTokenAmount } from '@/lib/utils/format';
 import { isValidSolanaAddress } from '@/lib/utils/address';
 import { t } from '@/lib/i18n';
@@ -25,7 +26,8 @@ interface SendModalProps {
 }
 
 export const SendModal = ({ open, onOpenChange }: SendModalProps) => {
-  const { tokens, sendFake } = useWalletStore();
+  const { tokens, sendReal } = useWalletStore();
+  const wallet = useWallet();
   const [selectedToken, setSelectedToken] = useState<TokenSym>('SOL');
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
@@ -62,30 +64,82 @@ export const SendModal = ({ open, onOpenChange }: SendModalProps) => {
 
   const handleSend = async () => {
     if (!validateForm()) return;
+    
+    // Check if wallet is connected
+    if (!wallet || !wallet.isConnected) {
+      toast({
+        title: 'Error',
+        description: 'Please connect your wallet first',
+        variant: 'destructive',
+      });
+      setError('Please connect your wallet first');
+      return;
+    }
+
+    // Check if passkeyData exists
+    try {
+      const storedPasskey = localStorage.getItem('lazorkit-passkey-data');
+      if (!storedPasskey) {
+        toast({
+          title: 'Error',
+          description: 'Please complete wallet setup first',
+          variant: 'destructive',
+        });
+        setError('Please complete wallet setup first');
+        return;
+      }
+    } catch (e) {
+      toast({
+        title: 'Error',
+        description: 'Please complete wallet setup first',
+        variant: 'destructive',
+      });
+      setError('Please complete wallet setup first');
+      return;
+    }
 
     setIsProcessing(true);
 
-    // Simulate processing delay
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    try {
+      console.log('🚀 Starting real send transaction:', {
+        token: selectedToken,
+        amount: amountNum,
+        recipient,
+      });
 
-    sendFake(selectedToken, amountNum, recipient);
-    console.log('send_confirm_success', {
-      token: selectedToken,
-      amount: amountNum,
-      recipient,
-    });
+      const success = await sendReal(selectedToken, amountNum, recipient, wallet);
+      
+      if (success) {
+        console.log('send_confirm_success', {
+          token: selectedToken,
+          amount: amountNum,
+          recipient,
+        });
 
-    toast({
-      title: 'Transaction sent',
-      description: `${amountNum} ${selectedToken} sent successfully`,
-    });
+        toast({
+          title: 'Transaction sent',
+          description: `${amountNum} ${selectedToken} sent successfully`,
+        });
 
-    // Reset form
-    setRecipient('');
-    setAmount('');
-    setError('');
-    setIsProcessing(false);
-    onOpenChange(false);
+        // Reset form
+        setRecipient('');
+        setAmount('');
+        setError('');
+        onOpenChange(false);
+      } else {
+        throw new Error('Transaction failed');
+      }
+    } catch (error) {
+      console.error('❌ Send transaction failed:', error);
+      toast({
+        title: 'Error',
+        description: 'Transaction failed. Please try again.',
+        variant: 'destructive',
+      });
+      setError('Transaction failed. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleMaxClick = () => {

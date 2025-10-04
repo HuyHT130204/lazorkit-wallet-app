@@ -8,6 +8,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { SimpleSelect } from './ui/simple-select';
 import { useWalletStore, TokenSym } from '@/lib/store/wallet';
+import { useWallet } from '@/hooks/use-lazorkit-wallet';
 import { formatTokenAmount } from '@/lib/utils/format';
 import { isValidSolanaAddress } from '@/lib/utils/address';
 import { t } from '@/lib/i18n';
@@ -19,7 +20,8 @@ interface SendModalViewportProps {
 }
 
 export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps) => {
-  const { tokens, sendFake } = useWalletStore();
+  const { tokens, sendReal } = useWalletStore();
+  const wallet = useWallet();
   const [selectedToken, setSelectedToken] = useState<TokenSym>('SOL');
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
@@ -56,30 +58,82 @@ export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps
 
   const handleSend = async () => {
     if (!validateForm()) return;
+    
+    // Check if wallet is connected
+    if (!wallet || !wallet.isConnected) {
+      toast({
+        title: t('common.error'),
+        description: 'Please connect your wallet first',
+        variant: 'destructive',
+      });
+      setError('Please connect your wallet first');
+      return;
+    }
+
+    // Check if passkeyData exists
+    try {
+      const storedPasskey = localStorage.getItem('lazorkit-passkey-data');
+      if (!storedPasskey) {
+        toast({
+          title: t('common.error'),
+          description: 'Please complete wallet setup first',
+          variant: 'destructive',
+        });
+        setError('Please complete wallet setup first');
+        return;
+      }
+    } catch (e) {
+      toast({
+        title: t('common.error'),
+        description: 'Please complete wallet setup first',
+        variant: 'destructive',
+      });
+      setError('Please complete wallet setup first');
+      return;
+    }
 
     setIsProcessing(true);
 
-    // Simulate processing delay
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    try {
+      console.log('🚀 Starting real send transaction:', {
+        token: selectedToken,
+        amount: amountNum,
+        recipient,
+      });
 
-    sendFake(selectedToken, amountNum, recipient);
-    console.log('send_confirm_success', {
-      token: selectedToken,
-      amount: amountNum,
-      recipient,
-    });
+      const success = await sendReal(selectedToken, amountNum, recipient, wallet);
+      
+      if (success) {
+        console.log('send_confirm_success', {
+          token: selectedToken,
+          amount: amountNum,
+          recipient,
+        });
 
-    toast({
-      title: t('send.transactionSent'),
-      description: `${amountNum} ${selectedToken} ${t('send.sentSuccessfully')}`,
-    });
+        toast({
+          title: t('send.transactionSent'),
+          description: `${amountNum} ${selectedToken} ${t('send.sentSuccessfully')}`,
+        });
 
-    // Reset form
-    setRecipient('');
-    setAmount('');
-    setError('');
-    setIsProcessing(false);
-    onOpenChange(false);
+        // Reset form
+        setRecipient('');
+        setAmount('');
+        setError('');
+        onOpenChange(false);
+      } else {
+        throw new Error('Transaction failed');
+      }
+    } catch (error) {
+      console.error('❌ Send transaction failed:', error);
+      toast({
+        title: t('common.error'),
+        description: t('send.transactionFailed'),
+        variant: 'destructive',
+      });
+      setError(t('send.transactionFailed'));
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleMaxClick = () => {
@@ -136,7 +190,7 @@ export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps
           </Label>
           <SimpleSelect
             value={selectedToken}
-            onValueChange={(value: TokenSym) => setSelectedToken(value)}
+            onValueChange={(value: string) => setSelectedToken(value as TokenSym)}
             options={tokenOptions}
             placeholder={t('send.selectToken')}
             className="h-10"
