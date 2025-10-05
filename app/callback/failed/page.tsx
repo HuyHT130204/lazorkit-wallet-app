@@ -22,12 +22,13 @@ export default function FailedCallbackPage() {
     return { amount, token, currency };
   }, [search]);
 
-  // Nếu user quay về từ checkout thất bại: kiểm tra passkey đã có ví để tự về Home
+  // Kiểm tra nếu user đã có wallet từ trước
   useEffect(() => {
     (async () => {
       try {
         const stored = typeof window !== 'undefined' ? localStorage.getItem('lazorkit-passkey-data') : null;
         if (!stored) return;
+        
         const passkeyData = JSON.parse(stored);
         const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
         const resp = await fetch(`${apiBase}/api/orders/check-wallet`, {
@@ -35,6 +36,7 @@ export default function FailedCallbackPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ passkeyData })
         });
+        
         if (resp.ok) {
           const data = await resp.json();
           if (data?.exists && data?.walletAddress) {
@@ -43,12 +45,13 @@ export default function FailedCallbackPage() {
               store.setHasWallet?.(true);
               store.setPubkey?.(data.walletAddress);
             } catch {}
-            // Không auto redirect; người dùng chủ động bấm nút
           }
         }
-      } catch {}
+      } catch (error) {
+        console.warn('Failed to check existing wallet:', error);
+      }
     })();
-  }, [router]);
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] relative overflow-hidden">

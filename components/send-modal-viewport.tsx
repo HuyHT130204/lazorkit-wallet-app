@@ -136,7 +136,7 @@ export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps
           </Label>
           <SimpleSelect
             value={selectedToken}
-            onValueChange={(value: TokenSym) => setSelectedToken(value)}
+            onValueChange={(value: string) => setSelectedToken(value as TokenSym)}
             options={tokenOptions}
             placeholder={t('send.selectToken')}
             className="h-10"

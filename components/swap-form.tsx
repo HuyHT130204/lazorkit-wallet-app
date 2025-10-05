@@ -143,9 +143,10 @@ export const SwapForm = ({
   const getTokenIcon = (symbol: string, size: number = 20) => {
     const token = tokenData?.get(symbol);
     const overrides: Record<string, string> = {
-      USDC: 'https://cryptologos.cc/logos/usd-coin-usdc-logo.svg?v=026',
-      USDT: 'https://cryptologos.cc/logos/tether-usdt-logo.svg?v=026',
-      SOL: 'https://cryptologos.cc/logos/solana-sol-logo.svg?v=026',
+      // Use CoinGecko CDN to avoid 403 from cryptologos hotlinking
+      USDC: 'https://assets.coingecko.com/coins/images/6319/standard/USD_Coin_icon.png',
+      USDT: 'https://assets.coingecko.com/coins/images/325/standard/Tether.png',
+      SOL: 'https://assets.coingecko.com/coins/images/4128/standard/solana.png',
     };
     const px = size;
       return (

@@ -1,14 +1,249 @@
 const express = require('express');
 const router = express.Router();
 const Order = require('../models/Order');
-const PasskeyWallet = require('../models/PasskeyWallet');
-// Use global fetch available in Node >=18
-const { createSmartWalletOnly } = require('../utils/lazorkit');
 const { transferSplTokenToUser } = require('../utils/transfer');
-const { Connection, PublicKey } = require('@solana/web3.js');
+const { Connection, PublicKey, Keypair, Transaction } = require('@solana/web3.js');
+const bs58 = require('bs58');
+let BN;
+try { BN = require('bn.js'); } catch (_) { BN = null; }
 
-// Helper to compute expiry
+// Import SDK package - prefer backend server API when available
+let LazorkitWalletBackend = null;
+const backendCandidates = [
+  '@lazorkit/wallet/backend',
+  '@lazorkit/wallet/server',
+  '@lazorkit/wallet/dist/backend',
+  '@lazorkit/wallet/dist/server',
+];
+for (const mod of backendCandidates) {
+  if (LazorkitWalletBackend) break;
+  try {
+    const loaded = require(mod);
+    if (loaded) {
+      LazorkitWalletBackend = loaded;
+    }
+  } catch (_) {
+    // ignore; try next candidate
+  }
+}
+
+const LazorkitWallet = LazorkitWalletBackend || require('@lazorkit/wallet');
+
 const fiveMinutesMs = 5 * 60 * 1000;
+
+// Helper: Convert any format to Uint8Array
+function toUint8Array(input) {
+  if (!input) return input;
+  
+  // Already Uint8Array
+  if (input instanceof Uint8Array) return input;
+  
+  // Buffer
+  if (Buffer.isBuffer(input)) return new Uint8Array(input);
+  
+  // Array or array-like object {0: 1, 1: 2, ...}
+  if (typeof input === 'object') {
+    // Check if it's array-like
+    if (Array.isArray(input)) {
+      return new Uint8Array(input);
+    }
+    // Check if it's object with numeric keys
+    const keys = Object.keys(input);
+    if (keys.length > 0 && keys.every(k => /^\d+$/.test(k))) {
+      const arr = [];
+      for (let i = 0; i < keys.length; i++) {
+        arr.push(input[i]);
+      }
+      return new Uint8Array(arr);
+    }
+  }
+  
+  // Base64url string
+  if (typeof input === 'string') {
+    try {
+      let s = input.replace(/-/g, '+').replace(/_/g, '/');
+      const pad = s.length % 4;
+      if (pad) s += '='.repeat(4 - pad);
+      const buf = Buffer.from(s, 'base64');
+      return new Uint8Array(buf);
+    } catch (err) {
+      console.error('Failed to decode base64url:', err);
+    }
+  }
+  
+  return input;
+}
+
+// Minimal BN-like shim when bn.js is unavailable
+function makeBnLike(bytes) {
+  const buf = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes || []);
+  return {
+    toArrayLike(Type, endian, length) {
+      const b = Buffer.from(buf);
+      // Default big-endian behavior similar to BN
+      let out = b;
+      if (length) {
+        if (b.length > length) out = b.slice(b.length - length);
+        else if (b.length < length) out = Buffer.concat([Buffer.alloc(length - b.length, 0), b]);
+      }
+      if (Type === Buffer) return out;
+      if (Type === Uint8Array) return new Uint8Array(out);
+      return Array.from(out);
+    }
+  };
+}
+
+// Helper: encode Uint8Array/Buffer to base64url string
+function toBase64Url(input) {
+  try {
+    if (!input) return input;
+    let buf;
+    if (input instanceof Uint8Array) buf = Buffer.from(input);
+    else if (Buffer.isBuffer(input)) buf = input;
+    else return input;
+    return buf.toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  } catch (_) {
+    return input;
+  }
+}
+
+// Normalize passkey data for SDK backend
+// CRITICAL: Backend SDK expects publicKey.x/y as Uint8Array
+function normalizePasskeyData(raw) {
+  if (!raw || typeof raw !== 'object') return raw;
+  
+  console.log('🔍 Normalizing passkey data, input types:', {
+    credentialId: typeof raw.credentialId,
+    userId: typeof raw.userId,
+    hasPublicKey: !!raw.publicKey,
+    publicKeyX: raw.publicKey?.x ? (raw.publicKey.x.constructor?.name || typeof raw.publicKey.x) : 'missing',
+    publicKeyY: raw.publicKey?.y ? (raw.publicKey.y.constructor?.name || typeof raw.publicKey.y) : 'missing'
+  });
+  
+  const out = { ...raw };
+  
+  // credentialId and userId can be base64url strings
+  if (out.credentialId && typeof out.credentialId !== 'string') {
+    out.credentialId = toBase64Url(out.credentialId);
+  }
+  if (out.userId && typeof out.userId !== 'string') {
+    out.userId = toBase64Url(out.userId);
+  }
+
+  // Prefer FE-provided JWK x/y if exists
+  const jwk = out.publicKeyJwk;
+  if (jwk?.x && jwk?.y) {
+    const toBytes = (s) => {
+      try {
+        let t = String(s).replace(/-/g, '+').replace(/_/g, '/');
+        const pad = t.length % 4; if (pad) t += '='.repeat(4 - pad);
+        const buf = Buffer.from(t, 'base64');
+        return new Uint8Array(buf);
+      } catch { return null; }
+    };
+    const xb = toBytes(jwk.x);
+    const yb = toBytes(jwk.y);
+    if (xb && yb) {
+      const pk = {
+        x: BN ? new BN(Buffer.from(xb)) : makeBnLike(xb),
+        y: BN ? new BN(Buffer.from(yb)) : makeBnLike(yb),
+      };
+      out.publicKey = pk;
+      console.log('✅ Used FE-provided publicKeyJwk x/y');
+    }
+  }
+
+  // CRITICAL: LazorKit backend expects publicKey.x and publicKey.y as BN-like
+  if (out.publicKey) {
+    let pk = out.publicKey;
+
+    // If pk is a base64/base64url string or a raw byte array, try to derive x/y
+    const maybeBytes = (val) => {
+      if (!val) return null;
+      if (typeof val === 'string') return toUint8Array(val);
+      if (val instanceof Uint8Array) return val;
+      if (Buffer.isBuffer(val)) return new Uint8Array(val);
+      if (Array.isArray(val)) return new Uint8Array(val);
+      return null;
+    };
+
+    // If x/y missing, attempt to parse from pk itself
+    if (!pk.x || !pk.y) {
+      const rawPkBytes = maybeBytes(pk);
+      if (rawPkBytes) {
+        let extracted = null;
+        if (rawPkBytes.length === 65 || rawPkBytes.length === 64) {
+          // Uncompressed EC pubkey or raw X||Y
+          const hasPrefix = rawPkBytes.length === 65 && rawPkBytes[0] === 0x04;
+          const start = hasPrefix ? 1 : 0;
+          extracted = rawPkBytes.slice(start, start + 64);
+        } else if (rawPkBytes.length > 65) {
+          // Try to detect ASN.1 SPKI: look for 0x03 <len> 0x00 0x04 then 64 bytes
+          for (let i = 0; i < rawPkBytes.length - 67; i++) {
+            if (rawPkBytes[i] === 0x03) {
+              const len = rawPkBytes[i + 1];
+              const zero = rawPkBytes[i + 2];
+              const marker = rawPkBytes[i + 3];
+              if (zero === 0x00 && marker === 0x04) {
+                const remain = rawPkBytes.length - (i + 4);
+                if (remain >= 64) {
+                  extracted = rawPkBytes.slice(i + 4, i + 4 + 64);
+                  break;
+                }
+              }
+            }
+          }
+          // Fallback: search the last 65 bytes block starting with 0x04
+          if (!extracted) {
+            for (let i = rawPkBytes.length - 65; i >= 0; i--) {
+              if (rawPkBytes[i] === 0x04) {
+                const slice = rawPkBytes.slice(i + 1, i + 1 + 64);
+                if (slice.length === 64) { extracted = slice; break; }
+              }
+            }
+          }
+        }
+
+        if (extracted && extracted.length === 64) {
+          const xBytes = extracted.slice(0, 32);
+          const yBytes = extracted.slice(32, 64);
+          pk = { x: xBytes, y: yBytes };
+          console.log('✅ Derived X/Y from DER/SPKI or raw publicKey buffer');
+        }
+      } else if (typeof pk === 'object' && (pk.x || pk.y)) {
+        // JWK-like with base64url x/y strings
+        const xb = maybeBytes(pk.x);
+        const yb = maybeBytes(pk.y);
+        if (xb && yb) pk = { x: xb, y: yb };
+      }
+    }
+
+    // After best-effort parsing, coerce x/y to BN-like
+    if (pk && typeof pk === 'object') {
+      const coerced = { ...pk };
+      if (coerced.x && !(coerced.x instanceof BN)) {
+        const xBytes = toUint8Array(coerced.x);
+        coerced.x = BN ? new BN(Buffer.from(xBytes)) : makeBnLike(xBytes);
+        console.log('✅ Converted/derived publicKey.x to BN-like');
+      }
+      if (coerced.y && !(coerced.y instanceof BN)) {
+        const yBytes = toUint8Array(coerced.y);
+        coerced.y = BN ? new BN(Buffer.from(yBytes)) : makeBnLike(yBytes);
+        console.log('✅ Converted/derived publicKey.y to BN-like');
+      }
+      out.publicKey = coerced;
+    }
+  }
+  
+  console.log('✅ Normalized passkey data:', {
+    credentialId: out.credentialId?.slice(0, 10) + '...',
+    publicKeyXType: out.publicKey?.x?.constructor?.name,
+    publicKeyYType: out.publicKey?.y?.constructor?.name,
+    // Length logs only for byte-like; BN does not expose length, skip
+  });
+  
+  return out;
+}
 
 router.post('/', async (req, res, next) => {
   try {
@@ -22,7 +257,6 @@ router.post('/', async (req, res, next) => {
     const returnSuccess = `${process.env.APP_BASE_URL || 'http://localhost:3000'}/callback/success?status=success&ref=${encodeURIComponent(reference)}&token=${encodeURIComponent(token || '')}&currency=${encodeURIComponent(currency)}&amount=${encodeURIComponent(amount)}`;
     const returnFailed = `${process.env.APP_BASE_URL || 'http://localhost:3000'}/callback/failed?status=failed&ref=${encodeURIComponent(reference)}&token=${encodeURIComponent(token || '')}&currency=${encodeURIComponent(currency)}&amount=${encodeURIComponent(amount)}`;
 
-    // Call provider API (Whatee or your gateway)
     const providerUrl = process.env.WHATEE_API_URL || 'https://onecheckout.sandbox.whatee.io/api/v1.0/orders';
     const providerKey = process.env.WHATEE_API_KEY || '';
     const merchantId = process.env.WHATEE_MERCHANT_ID || '';
@@ -34,8 +268,18 @@ router.post('/', async (req, res, next) => {
       reference,
       description: `Buy ${token || ''} via LazorKit`,
       metadata: Object.entries({ ...(metadata || {}), token: token || '' }).map(([key, value]) => ({ key, value: String(value) })),
-      // Đưa đủ mọi biến thể để provider nào cũng nhận được URL trả về FE
-      payment: { provider: 'stripe', method: 'card', flow: 'direct', success_url: returnSuccess, cancel_url: returnFailed, successUrl: returnSuccess, cancelUrl: returnFailed, return_url: returnSuccess, returnUrl: returnSuccess, redirect_url: returnSuccess },
+      payment: { 
+        provider: 'stripe', 
+        method: 'card', 
+        flow: 'direct', 
+        success_url: returnSuccess, 
+        cancel_url: returnFailed, 
+        successUrl: returnSuccess, 
+        cancelUrl: returnFailed, 
+        return_url: returnSuccess, 
+        returnUrl: returnSuccess, 
+        redirect_url: returnSuccess 
+      },
       redirectUrls: { success: returnSuccess, cancel: returnFailed },
       success_url: returnSuccess,
       cancel_url: returnFailed,
@@ -47,7 +291,6 @@ router.post('/', async (req, res, next) => {
       callback_url: `${process.env.APP_BASE_URL || 'http://localhost:3000'}/api/orders/callback/success`,
     };
 
-    // Provider requires order_lines with required keys
     if (Array.isArray(orderLines) && orderLines.length > 0) {
       body.order_lines = orderLines.map((l) => ({
         key: String(l.key || 'item'),
@@ -62,24 +305,27 @@ router.post('/', async (req, res, next) => {
       ];
     }
 
-    const payload = {
-      ...body,
-    };
-    console.log('[orders.create] payload =>', JSON.stringify(payload));
+    const payload = { ...body };
+    console.log('[orders.create] Creating order with reference:', reference);
 
     const resp = await fetch(providerUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', Authorization: `Bearer ${providerKey}` },
+      headers: { 
+        'Content-Type': 'application/json', 
+        'Accept': 'application/json', 
+        Authorization: `Bearer ${providerKey}` 
+      },
       body: JSON.stringify(payload),
     });
+
     if (!resp.ok) {
       let text = '';
       try { text = await resp.text(); } catch {}
-      // compress provider error body
       const plain = text.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
       const short = plain.slice(0, 300);
       return res.status(resp.status).json({ error: 'Provider error', details: short });
     }
+
     const data = await resp.json();
     let checkoutUrl =
       data?.checkoutUrl ||
@@ -107,7 +353,6 @@ router.post('/', async (req, res, next) => {
       const preferFromArray = (arr) => {
         if (!Array.isArray(arr)) return undefined;
         const urls = arr.filter((v) => typeof v === 'string' && String(v).startsWith('http'));
-        // Exclude thank-you/receipt pages; prefer real checkout/session URLs
         const notThank = urls.filter((u) => !/thank|receipt|success/i.test(u));
         const prioritized = notThank.filter((u) => /checkout|session|hosted|pay|stripe|onecheckout|whatee/i.test(u));
         return prioritized[1] || prioritized[2] || prioritized[0] || urls[1] || urls[2] || urls[0];
@@ -120,7 +365,6 @@ router.post('/', async (req, res, next) => {
         '';
 
       if (!checkoutUrl) {
-        // Deep scan for any http URLs and pick a likely candidate
         const candidates = [];
         const walk = (obj) => {
           if (!obj) return;
@@ -137,6 +381,7 @@ router.post('/', async (req, res, next) => {
       }
     }
 
+    // Save order to DB with passkeyData
     const order = await Order.create({
       reference,
       provider: 'stripe',
@@ -149,6 +394,12 @@ router.post('/', async (req, res, next) => {
       expiresAt: new Date(Date.now() + fiveMinutesMs),
     });
 
+    console.log('[orders.create] Order saved to DB:', {
+      reference: order.reference,
+      hasPasskeyData: !!order.passkeyData,
+      smartWalletAddress: order.passkeyData?.smartWalletAddress
+    });
+
     return res.json({ orderId: order._id, reference, checkoutUrl, status: order.status });
   } catch (err) {
     return next(err);
@@ -157,304 +408,228 @@ router.post('/', async (req, res, next) => {
 
 router.post('/callback/success', async (req, res, next) => {
   try {
-    const { reference, orderId, walletAddress, passkeyData } = req.body || {};
+    const { reference, orderId } = req.body || {};
     const ref = reference || orderId;
     if (!ref) return res.status(400).json({ error: 'Missing reference' });
+    
+    console.log('[callback/success] Processing payment for reference:', ref);
+    
+    // Step 1: Get order from DB
     const order = await Order.findOne({ reference: ref });
     if (!order) return res.status(404).json({ error: 'Order not found' });
 
-    // 1) Ensure wallet exists - SIMPLE CHECK: if provided address exists on-chain, reuse it
-    let finalWallet = walletAddress || order.walletAddress || (order.passkeyData && (order.passkeyData.smartWalletAddress || order.passkeyData.address));
-    const effectivePasskey = passkeyData || order.passkeyData;
+    console.log('[callback/success] Order found:', {
+      reference: order.reference,
+      hasPasskeyData: !!order.passkeyData,
+      smartWalletAddress: order.passkeyData?.smartWalletAddress
+    });
 
-    // Helper: check account exist on chain
-    async function accountExistsOnChain(address) {
-      try {
-        if (!address) return false;
-        const rpcUrl = process.env.RPC_URL || process.env.LAZORKIT_RPC_URL || 'https://api.devnet.solana.com';
-        const conn = new Connection(rpcUrl, 'confirmed');
-        const info = await conn.getAccountInfo(new PublicKey(address));
-        return !!info;
-      } catch (_) { return false; }
-    }
+    // Step 2: Get wallet address from order's passkeyData
+    const finalWallet = order.passkeyData?.smartWalletAddress;
     
-    // If no wallet yet, try use smartWalletAddress from passkey and verify on-chain
-    if (!finalWallet && effectivePasskey) {
+    if (!finalWallet) {
+      return res.status(400).json({ error: 'No wallet address found in order' });
+    }
+
+    console.log('[callback/success] Target wallet:', finalWallet);
+
+    const rpcUrl = process.env.RPC_URL || process.env.LAZORKIT_RPC_URL || 'https://api.devnet.solana.com';
+    const connection = new Connection(rpcUrl, 'confirmed');
+    
+    // Step 3: Check if wallet exists onchain
+    let accountInfo = await connection.getAccountInfo(new PublicKey(finalWallet));
+
+    if (!accountInfo) {
+      console.log('[callback/success] Wallet not onchain, creating smart wallet...');
+
       try {
-        console.log('🔍 Simplified check: prefer provided smartWalletAddress if exists on-chain');
-        console.log('🔍 effectivePasskey:', JSON.stringify(effectivePasskey, null, 2));
-        
-        // Extract key identifiers from passkey data
-        const currentPublicKey = effectivePasskey.publicKey || effectivePasskey.publickey;
-        // Avoid accidentally treating wallet address as credentialId
-        const rawCredentialId = effectivePasskey.credentialId;
-        const currentCredentialId = (rawCredentialId && typeof rawCredentialId === 'string' && rawCredentialId.length <= 200 && !/^([1-9A-HJ-NP-Za-km-z]{32,48})$/.test(rawCredentialId))
-          ? rawCredentialId
-          : undefined;
-        const providedSmartWallet = effectivePasskey.smartWalletAddress || effectivePasskey.address;
-        
-        console.log('🔍 Current passkey identifiers:', { publicKey: currentPublicKey, credentialId: currentCredentialId, providedSmartWallet });
-        
-        // Track resolved wallet to avoid accidental overwrite later
-        let resolvedWallet = null;
+        // Get admin keypair
+        const adminSecret = process.env.PRIVATE_KEY;
+        if (!adminSecret) {
+          throw new Error('Missing PRIVATE_KEY for admin signer');
+        }
+        const adminKeypair = Keypair.fromSecretKey(bs58.decode(adminSecret));
+        console.log('[callback/success] Admin keypair:', adminKeypair.publicKey.toString());
 
-        // Method A: If client provided smart wallet address and it exists on-chain → reuse
-        if (providedSmartWallet && await accountExistsOnChain(providedSmartWallet)) {
-          console.log('✅ Reuse provided smartWalletAddress (on-chain exists):', providedSmartWallet);
-          resolvedWallet = providedSmartWallet;
-          finalWallet = providedSmartWallet; // Cập nhật finalWallet ngay lập tức
-          // Persist mapping for future
-          try {
-            await PasskeyWallet.updateOne(
-              {
-                $or: [
-                  currentCredentialId ? { credentialId: currentCredentialId } : null,
-                  currentPublicKey ? { publicKey: currentPublicKey } : null,
-                ].filter(Boolean)
-              },
-              {
-                $setOnInsert: { credentialId: currentCredentialId || null, publicKey: currentPublicKey || null, meta: effectivePasskey },
-                $set: { walletAddress: providedSmartWallet, smartWalletId: effectivePasskey.smartWalletId }
-              },
-              { upsert: true }
-            );
-          } catch {}
+        // Normalize passkey data from DB
+        const passkeyDataToUse = normalizePasskeyData(order.passkeyData);
+        if (!passkeyDataToUse) {
+          throw new Error('Missing passkey data for smart wallet creation');
         }
 
-        // Method B: Look up from PasskeyWallet mapping collection (most reliable if no provided address)
-        let existingOrder = null;
-        if (!finalWallet && (currentCredentialId || currentPublicKey)) {
-          const mapped = await PasskeyWallet.findOne({
-            $or: [
-              currentCredentialId ? { credentialId: currentCredentialId } : null,
-              currentPublicKey ? { publicKey: currentPublicKey } : null,
-            ].filter(Boolean)
-          }).sort({ createdAt: -1 });
-          if (mapped && mapped.walletAddress) {
-            console.log('✅ PasskeyWallet map hit:', mapped.walletAddress);
-            resolvedWallet = mapped.walletAddress;
-            finalWallet = mapped.walletAddress; // Cập nhật finalWallet ngay lập tức
+        // Find SDK function
+        let result;
+        const LazorKitCls = LazorkitWallet?.LazorKit || LazorkitWallet?.default?.LazorKit;
+
+        if (typeof LazorKitCls === 'function' && typeof LazorKitCls.prototype?.createSmartWallet === 'function') {
+          console.log('[callback/success] Using LazorKit class');
+          const sdk = new LazorKitCls({
+            backend: true,
+            rpcUrl,
+            connection,
+            commitment: 'confirmed',
+            adminSigner: adminKeypair,
+          });
+          result = await sdk.createSmartWallet(passkeyDataToUse, {
+            walletAddress: finalWallet,
+            returnTransactionOnly: true,
+            returnTx: true,
+          });
+        } else {
+          console.log('[callback/success] Using standalone function');
+          const serverCreateFn =
+            (typeof LazorkitWallet === 'function' ? LazorkitWallet : null) ||
+            LazorkitWallet?.createSmartWallet ||
+            LazorkitWallet?.server?.createSmartWallet ||
+            LazorkitWallet?.backend?.createSmartWallet ||
+            LazorkitWallet?.default?.createSmartWallet ||
+            LazorkitWallet?.default?.server?.createSmartWallet ||
+            LazorkitWallet?.default?.backend?.createSmartWallet;
+
+          if (typeof serverCreateFn !== 'function') {
+            throw new Error('createSmartWallet is not available on @lazorkit/wallet');
           }
+
+          result = await serverCreateFn(passkeyDataToUse, {
+            backend: true,
+            rpcUrl,
+            connection,
+            commitment: 'confirmed',
+            adminSigner: adminKeypair,
+            walletAddress: finalWallet,
+            returnTransactionOnly: true,
+            returnTx: true,
+          });
         }
 
-        // Method C: Find by exact credentialId match within Orders (fallback)
-        if (!finalWallet && currentCredentialId) {
-          existingOrder = await Order.findOne({
-            'passkeyData.credentialId': currentCredentialId,
-            status: 'success',
-            walletAddress: { $exists: true, $ne: null }
-          }).sort({ createdAt: 1 });
+        console.log('[callback/success] Smart wallet creation result:', {
+          smartWalletAddress: result?.smartWalletAddress || finalWallet,
+          hasSignature: !!result?.signature,
+          hasTx: !!(result?.transaction || result?.tx)
+        });
+
+        // Sign and send transaction
+        if (result?.signature) {
+          console.log('[callback/success] Transaction already signed:', result.signature);
+        } else if (result?.transaction || result?.tx) {
+          const transaction = result.transaction || result.tx;
           
-          if (existingOrder) {
-            console.log('✅ Found existing wallet by credentialId:', existingOrder.walletAddress);
-            resolvedWallet = existingOrder.walletAddress;
-            finalWallet = existingOrder.walletAddress; // Cập nhật finalWallet ngay lập tức
+          if (!transaction.recentBlockhash) {
+            const { blockhash } = await connection.getLatestBlockhash('confirmed');
+            transaction.recentBlockhash = blockhash;
           }
-        }
-        
-        // Method D: If no credentialId match, try publicKey match
-        if (!finalWallet && !existingOrder && currentPublicKey) {
-          existingOrder = await Order.findOne({
-            $or: [
-              { 'passkeyData.publicKey': currentPublicKey },
-              { 'passkeyData.publickey': currentPublicKey }
-            ],
-            status: 'success',
-            walletAddress: { $exists: true, $ne: null }
-          }).sort({ createdAt: 1 });
+
+          if (!transaction.feePayer) {
+            transaction.feePayer = adminKeypair.publicKey;
+          }
+
+          transaction.sign(adminKeypair);
           
-          if (existingOrder) {
-            console.log('✅ Found existing wallet by publicKey:', existingOrder.walletAddress);
-            resolvedWallet = existingOrder.walletAddress;
-            finalWallet = existingOrder.walletAddress; // Cập nhật finalWallet ngay lập tức
-          }
-        }
-        
-        // Method E: If still no match, check for smartwalletAddress (without on-chain verify)
-        if (!finalWallet && !existingOrder && effectivePasskey.smartWalletAddress) {
-          existingOrder = await Order.findOne({
-            $or: [
-              { walletAddress: effectivePasskey.smartWalletAddress },
-              { 'passkeyData.smartWalletAddress': effectivePasskey.smartWalletAddress }
-            ],
-            status: 'success'
-          }).sort({ createdAt: -1 });
+          const rawTransaction = transaction.serialize();
+          const signature = await connection.sendRawTransaction(rawTransaction, {
+            skipPreflight: false,
+            preflightCommitment: 'confirmed'
+          });
+
+          console.log('[callback/success] Transaction sent:', signature);
           
-          if (existingOrder) {
-            console.log('✅ Found existing wallet by smartWalletAddress:', existingOrder.walletAddress);
-            resolvedWallet = existingOrder.walletAddress;
-            finalWallet = existingOrder.walletAddress; // Cập nhật finalWallet ngay lập tức
+          const confirmation = await connection.confirmTransaction(signature, 'confirmed');
+          
+          if (confirmation.value.err) {
+            throw new Error('Transaction failed: ' + JSON.stringify(confirmation.value.err));
           }
+          
+          console.log('[callback/success] Transaction confirmed');
         }
 
-        // Log final wallet decision
-        if (finalWallet) {
-          console.log('✅ Final wallet decision:', finalWallet);
+        // Verify wallet is now onchain
+        accountInfo = await connection.getAccountInfo(new PublicKey(finalWallet));
+        if (!accountInfo) {
+          throw new Error('Wallet still not onchain after creation');
         }
 
-        // Ensure mapping points to resolved wallet if we found one
-        if (finalWallet && resolvedWallet) {
-          console.log('🔄 Ensuring mapping points to resolved wallet:', resolvedWallet);
-          try {
-            await PasskeyWallet.updateOne(
-              {
-                $or: [
-                  currentCredentialId ? { credentialId: currentCredentialId } : null,
-                  currentPublicKey ? { publicKey: currentPublicKey } : null,
-                ].filter(Boolean)
-              },
-              { $set: { walletAddress: resolvedWallet, smartWalletId: effectivePasskey.smartWalletId || null } },
-              { upsert: true }
-            );
-          } catch (mapErr) {
-            console.warn('Could not enforce mapping to resolved wallet:', mapErr?.message);
-          }
-        }
+        console.log('[callback/success] Wallet verified onchain');
 
-        // Only create new wallet if after all checks we still don't have any wallet
-        if (!finalWallet && !resolvedWallet) {
-          console.log('🆕 No existing wallet found, creating new wallet for passkey');
-          console.log('🔍 Final check - finalWallet:', finalWallet, 'resolvedWallet:', resolvedWallet);
-          const created = await createSmartWalletOnly(effectivePasskey);
-          finalWallet = created?.address || created?.smartWalletAddress || created?.pubkey || null;
-
-          if (finalWallet) {
-            console.log('✅ New wallet created:', finalWallet);
-            // Persist mapping so future orders reuse this wallet
-            try {
-              await PasskeyWallet.updateOne(
-                {
-                  $or: [
-                    currentCredentialId ? { credentialId: currentCredentialId } : null,
-                    currentPublicKey ? { publicKey: currentPublicKey } : null,
-                  ].filter(Boolean)
-                },
-                {
-                  $setOnInsert: {
-                    credentialId: currentCredentialId || null,
-                    publicKey: currentPublicKey || null,
-                    smartWalletId: effectivePasskey.smartWalletId,
-                    walletAddress: finalWallet,
-                    meta: effectivePasskey,
-                  },
-                  $set: {
-                    walletAddress: finalWallet,
-                  }
-                },
-                { upsert: true }
-              );
-            } catch (mapErr) {
-              console.warn('Could not upsert PasskeyWallet mapping:', mapErr?.message);
-            }
-          } else {
-            console.error('❌ Failed to create wallet - no address returned');
-          }
-        }
       } catch (e) {
-        console.error('❌ Wallet creation/check failed:', e);
-        return res.status(500).json({ error: 'Wallet creation failed', details: e?.message });
+        const reason = e?.message || String(e);
+        console.error('[callback/success] Smart wallet creation failed:', reason);
+        console.error('[callback/success] Full error:', e);
+        return res.status(400).json({ 
+          error: 'Backend smart wallet creation failed', 
+          reason,
+          details: e?.stack 
+        });
       }
+    } else {
+      console.log('[callback/success] Wallet already exists onchain');
     }
 
-    // 2) Update current order with wallet address and passkeyData (if not already set)
-    let orderUpdated = false;
-    
-    if (finalWallet && !order.walletAddress) {
-      order.walletAddress = finalWallet;
-      console.log('💾 Updated order with wallet address:', finalWallet);
-      orderUpdated = true;
-    }
-    
-    if (effectivePasskey && !order.passkeyData) {
-      order.passkeyData = effectivePasskey;
-      console.log('💾 Updated order with passkeyData');
-      orderUpdated = true;
-    }
-    
-    // Also update passkeyData if it's more complete than what we have
-    if (effectivePasskey && order.passkeyData) {
-      const currentPasskey = order.passkeyData;
-      const newPasskey = effectivePasskey;
-      
-      // Check if new passkey data is more complete
-      const shouldUpdate = (
-        (!currentPasskey.credentialId && newPasskey.credentialId) ||
-        (!currentPasskey.publicKey && !currentPasskey.publickey && (newPasskey.publicKey || newPasskey.publickey)) ||
-        (!currentPasskey.smartWalletAddress && newPasskey.smartWalletAddress) ||
-        (!currentPasskey.smartWalletId && newPasskey.smartWalletId)
-      );
-      
-      if (shouldUpdate) {
-        order.passkeyData = { ...currentPasskey, ...newPasskey };
-        console.log('💾 Updated order with more complete passkeyData');
-        orderUpdated = true;
-      }
-    }
-    
-    if (orderUpdated) {
-      await order.save();
-    }
+    // Step 4: Transfer tokens
+    order.walletAddress = finalWallet;
 
-    // 3) Transfer SPL tokens from admin to user before marking success
     let txSignature = null;
     let creditedAmount = null;
+    
     try {
-      const shouldTransfer = Boolean(finalWallet) && Boolean(process.env.TOKEN_MINT) && Boolean(process.env.PRIVATE_KEY);
+      const shouldTransfer = Boolean(process.env.TOKEN_MINT) && Boolean(process.env.PRIVATE_KEY);
       if (shouldTransfer) {
-        // derive token amount from order amount; assuming 1:1 with currency for now
         const tokenAmount = Number(order.amount);
         creditedAmount = tokenAmount;
-        console.log('[orders.callback.success] transferring', {
+        
+        console.log('[callback/success] Transferring tokens:', {
           to: finalWallet,
           amount: tokenAmount,
           mint: process.env.TOKEN_MINT,
-          rpc: process.env.RPC_URL || process.env.LAZORKIT_RPC_URL,
         });
+        
         const transferResult = await transferSplTokenToUser(finalWallet, tokenAmount);
         txSignature = transferResult.signature;
+        
+        console.log('[callback/success] Token transfer completed:', txSignature);
       }
     } catch (e) {
-      // If transfer fails, keep order pending to retry later and bubble reason
-      const reason = e?.message || (typeof e?.toString === 'function' ? e.toString() : '') || JSON.stringify(e || {});
-      console.error('[orders.callback.success] transfer failed:', reason);
+      const reason = e?.message || 'Transfer failed';
+      console.error('[callback/success] Token transfer failed:', reason);
+      
       order.status = 'pending';
-      if (finalWallet) order.walletAddress = finalWallet;
-      if (passkeyData) order.passkeyData = { ...(order.passkeyData || {}), ...passkeyData };
       await order.save();
-      return res.status(202).json({ ok: false, pending: true, reason, reference: order.reference });
+      
+      return res.status(202).json({ 
+        ok: false, 
+        pending: true, 
+        reason, 
+        reference: order.reference 
+      });
     }
 
-    // 4) Mark success only after transfer ok
+    // Step 5: Update order status
     order.status = 'success';
-    if (finalWallet) order.walletAddress = finalWallet;
-    
-    // Merge passkeyData properly
-    if (passkeyData) {
-      order.passkeyData = { ...(order.passkeyData || {}), ...passkeyData };
-    }
-    
-    // Khi thành công, loại bỏ expiresAt để tránh TTL xóa nhầm
-    if (order.expiresAt) {
-      order.expiresAt = undefined;
-    }
-    
     if (txSignature) order.txSignature = txSignature;
     if (creditedAmount != null) order.creditedAmount = creditedAmount;
+    if (order.expiresAt) order.expiresAt = undefined;
     
     await order.save();
     
-    console.log('✅ Order marked as success:', {
+    console.log('[callback/success] Order completed:', {
       reference: order.reference,
       walletAddress: order.walletAddress,
-      passkeyData: order.passkeyData ? {
-        credentialId: order.passkeyData.credentialId,
-        publicKey: order.passkeyData.publicKey || order.passkeyData.publickey,
-        smartWalletAddress: order.passkeyData.smartWalletAddress
-      } : null
+      txSignature,
+      creditedAmount
     });
 
-    return res.json({ ok: true, walletAddress: finalWallet, reference: order.reference, status: order.status, txSignature, creditedAmount });
-  } catch (err) { return next(err); }
+    return res.json({ 
+      ok: true, 
+      walletAddress: finalWallet, 
+      reference: order.reference, 
+      status: order.status, 
+      txSignature, 
+      creditedAmount 
+    });
+    
+  } catch (err) { 
+    console.error('[callback/success] Error:', err);
+    return next(err); 
+  }
 });
 
 router.post('/callback/failed', async (req, res, next) => {
@@ -469,7 +644,6 @@ router.post('/callback/failed', async (req, res, next) => {
   } catch (err) { return next(err); }
 });
 
-// Get order detail by reference to retrieve walletAddress after returning to app
 router.get('/:reference', async (req, res, next) => {
   try {
     const reference = req.params.reference;
@@ -484,19 +658,16 @@ router.get('/:reference', async (req, res, next) => {
   } catch (err) { return next(err); }
 });
 
-// Get wallet balance from backend (sum of all successful orders for a wallet)
 router.get('/balance/:walletAddress', async (req, res, next) => {
   try {
     const walletAddress = req.params.walletAddress;
     if (!walletAddress) return res.status(400).json({ error: 'Missing wallet address' });
     
-    // Get all successful orders for this wallet
     const orders = await Order.find({ 
       walletAddress: walletAddress,
       status: 'success'
     });
     
-    // Sum up credited amounts by token
     const balances = {};
     orders.forEach(order => {
       if (order.creditedAmount && order.token) {
@@ -515,7 +686,6 @@ router.get('/balance/:walletAddress', async (req, res, next) => {
   } catch (err) { return next(err); }
 });
 
-// Check if wallet exists for given passkey data
 router.post('/check-wallet', async (req, res, next) => {
   try {
     const { passkeyData } = req.body || {};
@@ -524,64 +694,32 @@ router.post('/check-wallet', async (req, res, next) => {
       return res.status(400).json({ error: 'Missing passkeyData' });
     }
     
-    console.log('🔍 Checking for existing wallet with passkey data:', JSON.stringify(passkeyData, null, 2));
+    const smartWalletAddress = passkeyData.smartWalletAddress;
     
-    // Extract key identifiers from passkey data
-    const currentPublicKey = passkeyData.publicKey || passkeyData.publickey;
-    const currentCredentialId = passkeyData.credentialId;
-    
-    let existingOrder = null;
-    
-    // Method 1: Find by exact credentialId match (most reliable)
-    if (currentCredentialId) {
-      existingOrder = await Order.findOne({
-        'passkeyData.credentialId': currentCredentialId,
-        status: 'success',
-        walletAddress: { $exists: true, $ne: null }
-      }).sort({ createdAt: -1 });
-      
-      if (existingOrder) {
-        console.log('✅ Found existing wallet by credentialId:', existingOrder.walletAddress);
-      }
+    if (!smartWalletAddress) {
+      return res.json({
+        exists: false,
+        walletAddress: null,
+        orderReference: null,
+        passkeyData: null
+      });
     }
     
-    // Method 2: If no credentialId match, try publicKey match
-    if (!existingOrder && currentPublicKey) {
-      existingOrder = await Order.findOne({
-        $or: [
-          { 'passkeyData.publicKey': currentPublicKey },
-          { 'passkeyData.publickey': currentPublicKey }
-        ],
-        status: 'success',
-        walletAddress: { $exists: true, $ne: null }
-      }).sort({ createdAt: -1 });
-      
-      if (existingOrder) {
-        console.log('✅ Found existing wallet by publicKey:', existingOrder.walletAddress);
-      }
-    }
+    const rpcUrl = process.env.RPC_URL || process.env.LAZORKIT_RPC_URL || 'https://api.devnet.solana.com';
+    const connection = new Connection(rpcUrl, 'confirmed');
+    const accountInfo = await connection.getAccountInfo(new PublicKey(smartWalletAddress));
     
-    // Method 3: If still no match, check for smartwalletAddress in passkeyData
-    if (!existingOrder && passkeyData.smartWalletAddress) {
-      existingOrder = await Order.findOne({
-        $or: [
-          { walletAddress: passkeyData.smartWalletAddress },
-          { 'passkeyData.smartWalletAddress': passkeyData.smartWalletAddress }
-        ],
+    if (accountInfo) {
+      const existingOrder = await Order.findOne({
+        walletAddress: smartWalletAddress,
         status: 'success'
       }).sort({ createdAt: -1 });
       
-      if (existingOrder) {
-        console.log('✅ Found existing wallet by smartWalletAddress:', existingOrder.walletAddress);
-      }
-    }
-    
-    if (existingOrder && existingOrder.walletAddress) {
       return res.json({
         exists: true,
-        walletAddress: existingOrder.walletAddress,
-        orderReference: existingOrder.reference,
-        passkeyData: existingOrder.passkeyData
+        walletAddress: smartWalletAddress,
+        orderReference: existingOrder?.reference || null,
+        passkeyData: existingOrder?.passkeyData || passkeyData
       });
     } else {
       return res.json({
@@ -592,11 +730,9 @@ router.post('/check-wallet', async (req, res, next) => {
       });
     }
   } catch (err) {
-    console.error('❌ Check wallet failed:', err);
+    console.error('Check wallet failed:', err);
     return next(err);
   }
 });
 
 module.exports = router;
-
-

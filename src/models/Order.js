@@ -59,11 +59,8 @@ orderSchema.index({ status: 1 });
 // Không dùng TTL để tránh mất dữ liệu; cron sẽ chuyển trạng thái sang failed
 orderSchema.index({ expiresAt: 1 });
 
-// Index for passkey-based wallet lookup
-orderSchema.index({ 'passkeyData.credentialId': 1, status: 1 });
-orderSchema.index({ 'passkeyData.publicKey': 1, status: 1 });
-orderSchema.index({ 'passkeyData.publickey': 1, status: 1 });
-orderSchema.index({ 'passkeyData.smartWalletAddress': 1, status: 1 });
+// Index for wallet lookup
 orderSchema.index({ walletAddress: 1, status: 1 });
+orderSchema.index({ 'passkeyData.smartWalletAddress': 1, status: 1 });
 
 module.exports = mongoose.model('Order', orderSchema);
