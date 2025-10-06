@@ -168,63 +168,8 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
         throw new Error('Failed to get passkey data');
       }
       
-      // Bổ sung X/Y ở FE nếu SDK trả publicKey dạng base64
-      try {
-        const enhanceWithXY = async (raw: any) => {
-          if (!raw || typeof raw !== 'object') return raw;
-          const pk = raw.publicKey;
-          if (raw.publicKeyJwk?.x && raw.publicKeyJwk?.y) return raw; // đã có
-          if (typeof pk !== 'string') return raw;
-
-          const toArrayBuffer = (b64: string): ArrayBuffer => {
-            let s = b64.replace(/-/g, '+').replace(/_/g, '/');
-            const pad = s.length % 4; if (pad) s += '='.repeat(4 - pad);
-            const buf = typeof window !== 'undefined' ? Uint8Array.from(atob(s), c => c.charCodeAt(0)) : new Uint8Array(Buffer.from(s, 'base64'));
-            return buf.buffer;
-          };
-
-          const ab = toArrayBuffer(pk);
-          const subtle: SubtleCrypto | undefined = (typeof window !== 'undefined') ? window.crypto?.subtle : undefined;
-          if (!subtle) return raw;
-
-          const tryImport = async () => {
-            // thử SPKI trước
-            try {
-              const key = await subtle.importKey('spki', ab, { name: 'ECDSA', namedCurve: 'P-256' }, true, ['verify']);
-              const jwk: any = await subtle.exportKey('jwk', key);
-              if (jwk?.x && jwk?.y) return { x: jwk.x, y: jwk.y };
-            } catch {}
-            // fallback tìm 0x04 || X || Y
-            try {
-              const u8 = new Uint8Array(ab);
-              let slice: Uint8Array | null = null;
-              if (u8.length === 65 && u8[0] === 0x04) slice = u8.slice(1);
-              else if (u8.length === 64) slice = u8;
-              if (slice && slice.length === 64) {
-                const x = slice.slice(0, 32);
-                const y = slice.slice(32);
-                const toB64Url = (b: Uint8Array) => {
-                  let s = (typeof window !== 'undefined') ? btoa(String.fromCharCode(...b)) : Buffer.from(b).toString('base64');
-                  return s.replace(/=+$/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-                };
-                return { x: toB64Url(x), y: toB64Url(y) };
-              }
-            } catch {}
-            return null;
-          };
-
-          const xy = await tryImport();
-          if (xy?.x && xy?.y) {
-            return { ...raw, publicKeyJwk: { x: xy.x, y: xy.y } };
-          }
-          return raw;
-        };
-
-        const enhanced = await enhanceWithXY(passkeyData);
-        setPasskeyDataRef(enhanced);
-      } catch {
-        setPasskeyDataRef(passkeyData);
-      }
+      // KHÔNG LƯU localStorage - sẽ gửi trực tiếp vào order
+      setPasskeyDataRef(passkeyData);
 
       // Bước 2: Mở preview modal
       // KHÔNG tạo smart wallet ở FE
