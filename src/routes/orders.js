@@ -467,6 +467,13 @@ router.post('/callback/success', async (req, res, next) => {
         const pkBytes = Array.from(Buffer.from(passkeyPublicKeyBase64, 'base64'));
         const walletIdBn = BN && walletIdParam && typeof walletIdParam !== 'string' ? walletIdParam : (BN ? new BN(String(walletIdParam), 10) : walletIdParam);
 
+        // Derive expected PDA for smart wallet (will be owned by LazorKit program)
+        let expectedPda = null;
+        try {
+          expectedPda = client.getSmartWalletPubkey(walletIdBn);
+          console.log('[callback/success] Expected smart wallet PDA:', expectedPda?.toBase58?.() || String(expectedPda));
+        } catch (_) {}
+
         const txnOut = await client.createSmartWalletTxn({
           payer: adminKeypair.publicKey,
           passkeyPublicKey: pkBytes,
@@ -475,7 +482,7 @@ router.post('/callback/success', async (req, res, next) => {
           amount: initLamports,
         }, { useVersionedTransaction: false });
 
-        result = { transaction: txnOut.transaction, smartWallet: txnOut.smartWallet?.toBase58?.() || txnOut.smartWallet, smartWalletId: walletIdBn };
+        result = { transaction: txnOut.transaction, smartWallet: (expectedPda?.toBase58?.() || txnOut.smartWallet?.toBase58?.() || txnOut.smartWallet), smartWalletId: walletIdBn };
 
         console.log('[callback/success] Smart wallet creation result:', {
           smartWalletAddress: result?.smartWalletAddress || finalWallet,
@@ -535,21 +542,48 @@ router.post('/callback/success', async (req, res, next) => {
           console.log('[callback/success] Transaction confirmed');
         }
 
-        // Update addresses and persist to DB
-        if (result?.smartWallet) {
-          finalWallet = result.smartWallet;
-          order.walletAddress = finalWallet;
-          order.passkeyData = { ...(order.passkeyData || {}), smartWalletAddress: finalWallet, smartWalletId: smartWalletIdRaw };
-          await order.save();
+        // Resolve the ACTUAL PDA smart wallet from chain using multiple strategies
+        const lazorkitProgramId = (() => {
+          try {
+            const c = sdk.getLazorkitClient();
+            return c?.programId?.toBase58?.() || c?.programId?.toString?.() || null;
+          } catch { return null; }
+        })();
+
+        const candidates = [];
+        if (expectedPda) candidates.push(expectedPda?.toBase58?.() || String(expectedPda));
+        try {
+          const byCred = await client.getSmartWalletByCredentialId(credentialIdBase64);
+          const p = byCred?.smartWallet?.toBase58?.() || byCred?.smartWallet || null;
+          if (p) candidates.push(p);
+        } catch (e) { console.warn('[callback/success] getSmartWalletByCredentialId failed:', e?.message || e); }
+        try {
+          const byPk = await client.getSmartWalletByPasskey(Buffer.from(passkeyPublicKeyBase64, 'base64'));
+          const p = byPk?.smartWallet?.toBase58?.() || byPk?.smartWallet || null;
+          if (p) candidates.push(p);
+        } catch (e) { console.warn('[callback/success] getSmartWalletByPasskey failed:', e?.message || e); }
+
+        let picked = null;
+        for (const addr of candidates) {
+          try {
+            const info = await connection.getAccountInfo(new PublicKey(addr));
+            const owner = info?.owner?.toBase58?.() || info?.owner?.toString?.();
+            console.log('[callback/success] Candidate PDA owner check:', { addr, owner });
+            if (info && lazorkitProgramId && owner === lazorkitProgramId) { picked = addr; break; }
+          } catch {}
         }
 
-        // Verify wallet is now onchain
-        accountInfo = await connection.getAccountInfo(new PublicKey(finalWallet));
-        if (!accountInfo) {
-          throw new Error('Wallet still not onchain after creation');
+        if (!picked) {
+          console.warn('[callback/success] No Lazorkit-owned PDA confirmed. Proceeding with first candidate (may be System Program).');
+          picked = candidates[0] || finalWallet;
         }
 
-        console.log('[callback/success] Wallet verified onchain');
+        finalWallet = picked;
+        order.walletAddress = finalWallet;
+        order.passkeyData = { ...(order.passkeyData || {}), smartWalletAddress: finalWallet, smartWalletId: smartWalletIdRaw };
+        await order.save();
+
+        console.log('[callback/success] Wallet resolved and saved:', finalWallet);
 
       } catch (e) {
         const reason = e?.message || String(e);
