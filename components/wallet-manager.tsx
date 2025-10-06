@@ -63,8 +63,8 @@ export const WalletManager = () => {
     } catch (error) {
       console.error('Connect error:', error);
       toast({
-        title: 'Kết nối thất bại',
-        description: 'Vui lòng thử lại.',
+        title: t('notifications.connectFailed'),
+        description: t('notifications.connectFailedDesc'),
         variant: 'destructive',
       });
     }
@@ -137,14 +137,14 @@ export const WalletManager = () => {
     try {
       logout();
       toast({
-        title: 'Đăng xuất thành công',
-        description: 'Bạn đã đăng xuất khỏi ví.',
+        title: t('notifications.logoutSuccess'),
+        description: t('notifications.logoutSuccessDesc'),
       });
     } catch (error) {
       console.error('Logout error:', error);
       toast({
-        title: 'Lỗi đăng xuất',
-        description: 'Không thể đăng xuất. Vui lòng thử lại.',
+        title: t('notifications.logoutFailed'),
+        description: t('notifications.logoutFailedDesc'),
         variant: 'destructive',
       });
     }
@@ -154,14 +154,14 @@ export const WalletManager = () => {
     try {
       resetPasskey();
       toast({
-        title: 'Reset Passkey thành công',
-        description: 'Passkey đã được reset. Bạn có thể tạo passkey mới.',
+        title: t('notifications.resetPasskeySuccess'),
+        description: t('notifications.resetPasskeySuccessDesc'),
       });
     } catch (error) {
       console.error('Reset passkey error:', error);
       toast({
-        title: 'Lỗi reset Passkey',
-        description: 'Không thể reset passkey. Vui lòng thử lại.',
+        title: t('notifications.resetPasskeyFailed'),
+        description: t('notifications.resetPasskeyFailedDesc'),
         variant: 'destructive',
       });
     }
@@ -171,14 +171,14 @@ export const WalletManager = () => {
     try {
       resetWallet();
       toast({
-        title: 'Reset ví thành công',
-        description: 'Ví đã được reset hoàn toàn.',
+        title: t('notifications.resetWalletSuccess'),
+        description: t('notifications.resetWalletSuccessDesc'),
       });
     } catch (error) {
       console.error('Reset wallet error:', error);
       toast({
-        title: 'Lỗi reset ví',
-        description: 'Không thể reset ví. Vui lòng thử lại.',
+        title: t('notifications.resetWalletFailed'),
+        description: t('notifications.resetWalletFailedDesc'),
         variant: 'destructive',
       });
     }
@@ -275,14 +275,14 @@ export const WalletManager = () => {
               className="h-8 text-xs font-medium"
               variant="outline"
             >
-              Reset Passkey
+              {t('settings.regeneratePasskey')}
             </Button>
             <Button
               onClick={handleResetWallet}
               className="h-8 text-xs font-medium"
               variant="outline"
             >
-              Reset Ví
+              {t('settings.resetDemoData')}
             </Button>
           </div>
 

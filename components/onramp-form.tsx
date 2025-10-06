@@ -249,7 +249,7 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
               <div className='flex-1 ml-3 text-right'>
                 <div className='mb-1'>
                   <span className='text-xs text-muted-foreground'>
-                    {fromCurrency === 'VND' ? 'Tối thiểu 540,000 ₫ • Tối đa 13,500,000 ₫' : `${t('onRamp.minAmount')} • ${t('onRamp.maxAmount')}`}
+                    {fromCurrency === 'VND' ? t('onRamp.minAmount') + ' • ' + t('onRamp.maxAmount') : `${t('onRamp.minAmount')} • ${t('onRamp.maxAmount')}`}
                   </span>
                 </div>
                 <Input

@@ -118,7 +118,7 @@ export const FakeTransactionTester = () => {
             🎭 Fake Transaction Tester
           </h3>
           <p className="text-sm text-muted-foreground">
-            Test các chức năng với ví giả: {pubkey}
+            Test features with demo wallet: {pubkey}
           </p>
         </div>
 
@@ -170,7 +170,7 @@ export const FakeTransactionTester = () => {
 
         {isProcessing && (
           <div className="text-center text-sm text-muted-foreground">
-            Đang xử lý {lastAction}...
+            Processing {lastAction}...
           </div>
         )}
 

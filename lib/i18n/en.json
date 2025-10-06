@@ -29,7 +29,8 @@
     "none": "None",
     "yes": "Yes",
     "no": "No",
-    "notAvailable": "Not available"
+    "notAvailable": "Not available",
+    "logout": "Logout"
   },
   "app": {
     "title": "LazorKit",
@@ -226,7 +227,9 @@
     "emptyTitle": "No assets yet",
     "emptySubtitle": "Buy USDC to get started",
     "buyCta": "Buy USDC",
-    "tokensCount": "Tokens: {{count}}"
+    "tokensCount": "Tokens: {{count}}",
+    "hideZeroShort": "Hide 0",
+    "showZeroShort": "Show 0"
   },
   "devices": {
     "title": "Connected Devices",
@@ -330,6 +333,20 @@
     "realSwapFailedDesc": "Failed to execute swap transaction",
     "demoSwapConfirmed": "Demo Swap confirmed",
     "noPubkeySharing": "No pubkey available for sharing",
-    "noPubkeyCopying": "No pubkey available for copying"
+    "noPubkeyCopying": "No pubkey available for copying",
+    "logoutSuccess": "Logged out",
+    "logoutSuccessDesc": "You have been logged out of the wallet.",
+    "logoutFailed": "Logout failed",
+    "logoutFailedDesc": "Unable to logout. Please try again.",
+    "connectFailed": "Connection failed",
+    "connectFailedDesc": "Please try again.",
+    "resetPasskeySuccess": "Passkey reset",
+    "resetPasskeySuccessDesc": "Passkey has been reset. You can create a new one.",
+    "resetPasskeyFailed": "Reset Passkey failed",
+    "resetPasskeyFailedDesc": "Unable to reset Passkey. Please try again.",
+    "resetWalletSuccess": "Wallet reset",
+    "resetWalletSuccessDesc": "The wallet has been completely reset.",
+    "resetWalletFailed": "Reset wallet failed",
+    "resetWalletFailedDesc": "Unable to reset wallet. Please try again."
   }
 }

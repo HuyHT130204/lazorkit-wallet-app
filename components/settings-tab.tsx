@@ -82,14 +82,14 @@ export const SettingsTab = () => {
     try {
       logout();
       toast({
-        title: 'Đăng xuất thành công',
-        description: 'Bạn đã đăng xuất khỏi ví.',
+        title: t('notifications.logoutSuccess'),
+        description: t('notifications.logoutSuccessDesc'),
       });
     } catch (error) {
       console.error('Logout error:', error);
       toast({
-        title: 'Lỗi đăng xuất',
-        description: 'Không thể đăng xuất. Vui lòng thử lại.',
+        title: t('notifications.logoutFailed'),
+        description: t('notifications.logoutFailedDesc'),
         variant: 'destructive',
       });
     }
@@ -319,35 +319,16 @@ export const SettingsTab = () => {
         
         <Card className='border border-destructive/20 bg-destructive/5 backdrop-blur-sm shadow-sm'>
           <CardContent className='p-4'>
-            <div className='space-y-3'>
-              <div className='flex items-start gap-2'>
-                <Info className='h-4 w-4 text-destructive mt-0.5 flex-shrink-0' />
-                <p className='text-xs text-muted-foreground leading-relaxed'>
-                  {t('settings.confirmReset')}
-                </p>
-              </div>
-              
-              <div className='space-y-2'>
-                <Button
-                  variant='destructive'
-                  size='sm'
-                  onClick={handleLogout}
-                  className='w-full h-10 gap-2 font-medium'
-                >
-                  <Trash2 className='h-4 w-4' />
-                  Đăng xuất
-                </Button>
-                
-                <Button
-                  variant='destructive'
-                  size='sm'
-                  onClick={handleResetDemoData}
-                  className='w-full h-10 gap-2 font-medium'
-                >
-                  <Trash2 className='h-4 w-4' />
-                  {t('settings.resetDemoData')}
-                </Button>
-              </div>
+            <div className='space-y-2'>
+              <Button
+                variant='destructive'
+                size='sm'
+                onClick={handleLogout}
+                className='w-full h-10 gap-2 font-medium'
+              >
+                <Trash2 className='h-4 w-4' />
+                {t('common.logout')}
+              </Button>
             </div>
           </CardContent>
         </Card>

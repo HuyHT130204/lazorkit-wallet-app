@@ -127,7 +127,7 @@ export const AssetsTab = () => {
             aria-label={hideZero ? 'Show zero-balance tokens' : 'Hide zero-balance tokens'}
           >
             <Filter className='h-3.5 w-3.5' />
-            {hideZero ? 'Ẩn 0' : 'Hiện 0'}
+            {hideZero ? t('assets.hideZeroShort') : t('assets.showZeroShort')}
           </button>
           <button
           className='p-2 rounded-md hover:bg-muted/50 text-muted-foreground'

@@ -29,7 +29,8 @@
     "none": "Không có",
     "yes": "Có",
     "no": "Không",
-    "notAvailable": "Không khả dụng"
+    "notAvailable": "Không khả dụng",
+    "logout": "Đăng xuất"
   },
   "app": {
     "title": "Ví LazorKit",
@@ -226,7 +227,9 @@
     "emptyTitle": "Chưa có tài sản",
     "emptySubtitle": "Mua USDC để bắt đầu",
     "buyCta": "Mua USDC",
-    "tokensCount": "Số token: {{count}}"
+    "tokensCount": "Số token: {{count}}",
+    "hideZeroShort": "Ẩn 0",
+    "showZeroShort": "Hiện 0"
   },
   "devices": {
     "title": "Thiết bị đã kết nối",
@@ -330,6 +333,20 @@
     "realSwapFailedDesc": "Không thể thực hiện giao dịch hoán đổi",
     "demoSwapConfirmed": "Hoán đổi demo đã xác nhận",
     "noPubkeySharing": "Không có khóa công khai để chia sẻ",
-    "noPubkeyCopying": "Không có khóa công khai để sao chép"
+    "noPubkeyCopying": "Không có khóa công khai để sao chép",
+    "logoutSuccess": "Đăng xuất thành công",
+    "logoutSuccessDesc": "Bạn đã đăng xuất khỏi ví.",
+    "logoutFailed": "Lỗi đăng xuất",
+    "logoutFailedDesc": "Không thể đăng xuất. Vui lòng thử lại.",
+    "connectFailed": "Kết nối thất bại",
+    "connectFailedDesc": "Vui lòng thử lại.",
+    "resetPasskeySuccess": "Reset Passkey thành công",
+    "resetPasskeySuccessDesc": "Passkey đã được reset. Bạn có thể tạo passkey mới.",
+    "resetPasskeyFailed": "Lỗi reset Passkey",
+    "resetPasskeyFailedDesc": "Không thể reset passkey. Vui lòng thử lại.",
+    "resetWalletSuccess": "Reset ví thành công",
+    "resetWalletSuccessDesc": "Ví đã được reset hoàn toàn.",
+    "resetWalletFailed": "Lỗi reset ví",
+    "resetWalletFailedDesc": "Không thể reset ví. Vui lòng thử lại."
   }
 }
