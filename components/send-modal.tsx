@@ -14,6 +14,10 @@ import {
   SelectValue,
 } from './ui/select';
 import { useWalletStore, TokenSym } from '@/lib/store/wallet';
+import { useWallet } from '@/hooks/use-lazorkit-wallet';
+import { TOKEN_ADDRESSES, TOKEN_DECIMALS, defaultConnection } from '@/lib/services/jupiter';
+import { PublicKey, SystemProgram } from '@solana/web3.js';
+import * as splToken from '@solana/spl-token';
 import { formatTokenAmount } from '@/lib/utils/format';
 import { isValidSolanaAddress } from '@/lib/utils/address';
 import { t } from '@/lib/i18n';
@@ -25,7 +29,8 @@ interface SendModalProps {
 }
 
 export const SendModal = ({ open, onOpenChange }: SendModalProps) => {
-  const { tokens, sendFake } = useWalletStore();
+  const { tokens, pubkey, addActivity } = useWalletStore();
+  const lz = useWallet() as any;
   const [selectedToken, setSelectedToken] = useState<TokenSym>('SOL');
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
@@ -65,27 +70,80 @@ export const SendModal = ({ open, onOpenChange }: SendModalProps) => {
 
     setIsProcessing(true);
 
-    // Simulate processing delay
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    try {
+      if (!pubkey) throw new Error('No wallet address');
+      const owner = new PublicKey(pubkey);
+      const recipientPk = new PublicKey(recipient);
 
-    sendFake(selectedToken, amountNum, recipient);
-    console.log('send_confirm_success', {
-      token: selectedToken,
-      amount: amountNum,
-      recipient,
-    });
+      if (!lz?.signAndSendTransaction) throw new Error('signAndSendTransaction not available');
 
-    toast({
-      title: 'Transaction sent',
-      description: `${amountNum} ${selectedToken} sent successfully`,
-    });
+      let sig: string;
+      if (selectedToken === 'SOL') {
+        const lamports = Math.round(amountNum * 1e9);
+        const transferIx = SystemProgram.transfer({ fromPubkey: owner, toPubkey: recipientPk, lamports });
+        sig = await lz.signAndSendTransaction([transferIx]);
+      } else {
+        const mint = (TOKEN_ADDRESSES as Record<string, string>)[selectedToken];
+        if (!mint) throw new Error('Unsupported token');
+        const decimals = TOKEN_DECIMALS[selectedToken as keyof typeof TOKEN_DECIMALS] ?? 6;
+        const rawAmount = Math.round(amountNum * Math.pow(10, decimals));
+        const mintPk = new PublicKey(mint);
 
-    // Reset form
-    setRecipient('');
-    setAmount('');
-    setError('');
-    setIsProcessing(false);
-    onOpenChange(false);
+        const fromAta = await (splToken as any).getAssociatedTokenAddress(mintPk, owner, true);
+        let toAta;
+        try {
+          toAta = await (splToken as any).getAssociatedTokenAddress(mintPk, recipientPk, false);
+        } catch (err: any) {
+          if (err?.name === 'TokenOwnerOffCurveError' || /OffCurve/i.test(String(err?.message))) {
+            toAta = await (splToken as any).getAssociatedTokenAddress(mintPk, recipientPk, true);
+          } else {
+            throw err;
+          }
+        }
+
+        const toAtaInfo = await defaultConnection.getAccountInfo(toAta);
+        if (!toAtaInfo) {
+          // Split into two smaller transactions to avoid size limits
+          const createAtaIx = (splToken as any).createAssociatedTokenAccountInstruction(
+            owner, // payer
+            toAta, // ata
+            recipientPk, // owner
+            mintPk // mint
+          );
+          await lz.signAndSendTransaction([createAtaIx]);
+        }
+
+        const transferIx = typeof (splToken as any).createTransferInstruction === 'function'
+          ? (splToken as any).createTransferInstruction(fromAta, toAta, owner, rawAmount)
+          : (splToken as any).createTransferCheckedInstruction(fromAta, mintPk, toAta, owner, rawAmount, decimals);
+
+        sig = await lz.signAndSendTransaction([transferIx]);
+      }
+
+      addActivity?.({
+        id: Date.now().toString(),
+        kind: 'send',
+        ts: new Date().toISOString(),
+        summary: `Sent ${amountNum} ${selectedToken} to ${recipient.slice(0,4)}...${recipient.slice(-4)}`,
+        amount: amountNum,
+        token: selectedToken,
+        counterparty: recipient,
+        status: 'Success',
+        tx: sig,
+      } as any);
+
+      toast({ title: 'Transaction sent', description: `${amountNum} ${selectedToken} sent successfully` });
+
+      setRecipient('');
+      setAmount('');
+      setError('');
+      onOpenChange(false);
+    } catch (e: any) {
+      console.error('Send failed:', e);
+      toast({ title: 'Send failed', description: e?.message || String(e), variant: 'destructive' });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleMaxClick = () => {

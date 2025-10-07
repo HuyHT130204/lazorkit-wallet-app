@@ -1,5 +1,8 @@
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
+const https = require('https');
 const { connectDB } = require('./src/db');
 const { startCronJob } = require('./src/utils/cron');
 require('dotenv').config({ path: '.env.local' });
@@ -15,7 +18,7 @@ const parseAllowedOrigins = () => {
     .map((s) => s.trim())
     .filter(Boolean);
   if (process.env.NODE_ENV !== 'production') {
-    list.push('http://localhost:3000', 'http://127.0.0.1:3000');
+    list.push('https://localhost:3000', 'https://127.0.0.1:3000');
   }
   return Array.from(new Set(list));
 };
@@ -79,7 +82,7 @@ app.use((req, res) => {
   });
 });
 
-// Start server
+// Start server (HTTPS enforced)
 const startServer = async () => {
   try {
     await connectDB();
@@ -89,11 +92,26 @@ const startServer = async () => {
     // Do not exit; routes will use in-memory storage when DB is unavailable
   }
 
-  app.listen(PORT, () => {
-    console.log(`🚀 API Server running on port ${PORT}`);
-    console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
+  const keyPath = process.env.SSL_KEY_PATH || path.resolve(__dirname, 'certs', 'localhost.key');
+  const certPath = process.env.SSL_CERT_PATH || path.resolve(__dirname, 'certs', 'localhost.crt');
+
+  let key;
+  let cert;
+  try {
+    key = fs.readFileSync(keyPath);
+    cert = fs.readFileSync(certPath);
+  } catch (e) {
+    console.error('❌ SSL certificates not found. Expected at:', { keyPath, certPath });
+    console.error('Please generate local trusted certs (e.g., with mkcert) and set SSL_KEY_PATH/SSL_CERT_PATH.');
+    process.exit(1);
+  }
+
+  const httpsServer = https.createServer({ key, cert }, app);
+  httpsServer.listen(PORT, () => {
+    console.log(`🔐 HTTPS API Server running on https://localhost:${PORT}`);
+    console.log(`📊 Health check: https://localhost:${PORT}/api/health`);
     console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
-    
+
     // Start cron job for expired orders
     startCronJob();
   });

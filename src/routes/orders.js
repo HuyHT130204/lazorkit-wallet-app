@@ -158,7 +158,7 @@ function normalizePasskeyData(raw) {
   if (out.userId && typeof out.userId !== 'string') {
     out.userId = toBase64Url(out.userId);
   }
-  
+
   // CRITICAL: publicKey.x and publicKey.y MUST be Uint8Array
   if (out.publicKey && typeof out.publicKey === 'object') {
     const pk = { ...out.publicKey };
@@ -198,8 +198,8 @@ router.post('/', async (req, res, next) => {
 
     const reference = `lz_${Date.now()}`;
 
-    const returnSuccess = `${process.env.APP_BASE_URL || 'http://localhost:3000'}/callback/success?status=success&ref=${encodeURIComponent(reference)}&token=${encodeURIComponent(token || '')}&currency=${encodeURIComponent(currency)}&amount=${encodeURIComponent(amount)}`;
-    const returnFailed = `${process.env.APP_BASE_URL || 'http://localhost:3000'}/callback/failed?status=failed&ref=${encodeURIComponent(reference)}&token=${encodeURIComponent(token || '')}&currency=${encodeURIComponent(currency)}&amount=${encodeURIComponent(amount)}`;
+    const returnSuccess = `${process.env.APP_BASE_URL || 'https://localhost:3000'}/callback/success?status=success&ref=${encodeURIComponent(reference)}&token=${encodeURIComponent(token || '')}&currency=${encodeURIComponent(currency)}&amount=${encodeURIComponent(amount)}`;
+    const returnFailed = `${process.env.APP_BASE_URL || 'https://localhost:3000'}/callback/failed?status=failed&ref=${encodeURIComponent(reference)}&token=${encodeURIComponent(token || '')}&currency=${encodeURIComponent(currency)}&amount=${encodeURIComponent(amount)}`;
 
     const providerUrl = process.env.WHATEE_API_URL || 'https://onecheckout.sandbox.whatee.io/api/v1.0/orders';
     const providerKey = process.env.WHATEE_API_KEY || '';
@@ -232,7 +232,7 @@ router.post('/', async (req, res, next) => {
       return_url: returnSuccess,
       returnUrl: returnSuccess,
       redirect_url: returnSuccess,
-      callback_url: `${process.env.APP_BASE_URL || 'http://localhost:3000'}/api/orders/callback/success`,
+      callback_url: `${process.env.APP_BASE_URL || 'https://localhost:3000'}/api/orders/callback/success`,
     };
 
     if (Array.isArray(orderLines) && orderLines.length > 0) {

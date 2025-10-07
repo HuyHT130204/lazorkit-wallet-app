@@ -8,6 +8,10 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { SimpleSelect } from './ui/simple-select';
 import { useWalletStore, TokenSym } from '@/lib/store/wallet';
+import { useWallet } from '@/hooks/use-lazorkit-wallet';
+import { TOKEN_ADDRESSES, TOKEN_DECIMALS, defaultConnection } from '@/lib/services/jupiter';
+import { PublicKey, SystemProgram } from '@solana/web3.js';
+import * as splToken from '@solana/spl-token';
 import { formatTokenAmount } from '@/lib/utils/format';
 import { isValidSolanaAddress } from '@/lib/utils/address';
 import { t } from '@/lib/i18n';
@@ -19,7 +23,8 @@ interface SendModalViewportProps {
 }
 
 export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps) => {
-  const { tokens, sendFake } = useWalletStore();
+  const { tokens, pubkey, addActivity } = useWalletStore();
+  const lz = useWallet() as any;
   const [selectedToken, setSelectedToken] = useState<TokenSym>('SOL');
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
@@ -56,30 +61,88 @@ export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps
 
   const handleSend = async () => {
     if (!validateForm()) return;
+    if (!pubkey) {
+      toast({ title: t('common.error'), description: t('send.noWallet'), variant: 'destructive' });
+      return;
+    }
 
     setIsProcessing(true);
+    try {
+      const ownerPk = new PublicKey(pubkey);
+      const recipientPk = new PublicKey(recipient);
 
-    // Simulate processing delay
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+      if (!lz?.signAndSendTransaction) throw new Error('signAndSendTransaction not available');
 
-    sendFake(selectedToken, amountNum, recipient);
-    console.log('send_confirm_success', {
-      token: selectedToken,
-      amount: amountNum,
-      recipient,
-    });
+      let sig: string;
+      if (selectedToken === 'SOL') {
+        const lamports = Math.round(amountNum * 1e9);
+        const transferIx = SystemProgram.transfer({ fromPubkey: ownerPk, toPubkey: recipientPk, lamports });
+        sig = await lz.signAndSendTransaction([transferIx]);
+      } else {
+        const mintStr = (TOKEN_ADDRESSES as Record<string, string>)[selectedToken];
+        if (!mintStr) throw new Error('Unknown token mint');
+        const decimals = TOKEN_DECIMALS[selectedToken as keyof typeof TOKEN_DECIMALS] ?? 6;
+        const rawAmount = Math.round(amountNum * Math.pow(10, decimals));
+        const mintPk = new PublicKey(mintStr);
 
-    toast({
-      title: t('send.transactionSent'),
-      description: `${amountNum} ${selectedToken} ${t('send.sentSuccessfully')}`,
-    });
+        const fromAta = await (splToken as any).getAssociatedTokenAddress(mintPk, ownerPk, true);
+        let toAta;
+        try {
+          toAta = await (splToken as any).getAssociatedTokenAddress(mintPk, recipientPk, false);
+        } catch (err: any) {
+          if (err?.name === 'TokenOwnerOffCurveError' || /OffCurve/i.test(String(err?.message))) {
+            toAta = await (splToken as any).getAssociatedTokenAddress(mintPk, recipientPk, true);
+          } else {
+            throw err;
+          }
+        }
 
-    // Reset form
-    setRecipient('');
-    setAmount('');
-    setError('');
-    setIsProcessing(false);
-    onOpenChange(false);
+        const toAtaInfo = await defaultConnection.getAccountInfo(toAta);
+        if (!toAtaInfo) {
+          // Split into two smaller transactions to avoid size limits
+          const createAtaIx = (splToken as any).createAssociatedTokenAccountInstruction(
+            ownerPk,
+            toAta,
+            recipientPk,
+            mintPk
+          );
+          await lz.signAndSendTransaction([createAtaIx]);
+        }
+
+        const transferIx = typeof (splToken as any).createTransferInstruction === 'function'
+          ? (splToken as any).createTransferInstruction(fromAta, toAta, ownerPk, rawAmount)
+          : (splToken as any).createTransferCheckedInstruction(fromAta, mintPk, toAta, ownerPk, rawAmount, decimals);
+
+        sig = await lz.signAndSendTransaction([transferIx]);
+      }
+
+      addActivity?.({
+        id: Date.now().toString(),
+        kind: 'send',
+        ts: new Date().toISOString(),
+        summary: `Sent ${amountNum} ${selectedToken} to ${recipient.slice(0, 4)}...${recipient.slice(-4)}`,
+        amount: amountNum,
+        token: selectedToken,
+        counterparty: recipient,
+        status: 'Success',
+        tx: sig,
+      } as any);
+
+      toast({
+        title: t('send.transactionSent'),
+        description: `${amountNum} ${selectedToken} ${t('send.sentSuccessfully')}`,
+      });
+
+      setRecipient('');
+      setAmount('');
+      setError('');
+      onOpenChange(false);
+    } catch (e: any) {
+      console.error('Send failed:', e);
+      toast({ title: t('common.error'), description: e?.message || 'Send failed', variant: 'destructive' });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleMaxClick = () => {

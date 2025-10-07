@@ -119,7 +119,7 @@ export const AssetsTab = () => {
         <h3 className='text-lg font-semibold'>{t('assets.title')}</h3>
         <div className='flex items-center gap-2'>
           <span className='text-[10px] px-1.5 py-0.5 rounded bg-muted/40 text-muted-foreground border border-border/50'>
-            {t('assets.tokensCount', { count: getNumNonZeroTokens ? getNumNonZeroTokens() : tokens.filter(t => t.amount > 0).length })}
+            {t('assets.tokensCount', { count: 0 })}
           </span>
           <button
             className={`px-2 h-7 rounded-md border text-xs items-center gap-1 hidden sm:inline-flex ${hideZero ? 'bg-primary/10 border-primary/40 text-primary' : 'bg-muted/40 border-border/50 text-muted-foreground'}`}
