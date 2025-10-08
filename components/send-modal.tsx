@@ -71,8 +71,9 @@ export const SendModal = ({ open, onOpenChange }: SendModalProps) => {
     setIsProcessing(true);
 
     try {
-      if (!pubkey) throw new Error('No wallet address');
-      const owner = new PublicKey(pubkey);
+      const activeAddress = (lz as any)?.address || pubkey;
+      if (!activeAddress) throw new Error('No wallet address');
+      const owner = new PublicKey(activeAddress);
       const recipientPk = new PublicKey(recipient);
 
       if (!lz?.signAndSendTransaction) throw new Error('signAndSendTransaction not available');
@@ -101,23 +102,29 @@ export const SendModal = ({ open, onOpenChange }: SendModalProps) => {
           }
         }
 
+        // Create instructions array
+        const instructions = [];
+
+        // Check if recipient ATA exists, if not add create ATA instruction
         const toAtaInfo = await defaultConnection.getAccountInfo(toAta);
         if (!toAtaInfo) {
-          // Split into two smaller transactions to avoid size limits
           const createAtaIx = (splToken as any).createAssociatedTokenAccountInstruction(
             owner, // payer
             toAta, // ata
             recipientPk, // owner
             mintPk // mint
           );
-          await lz.signAndSendTransaction([createAtaIx]);
+          instructions.push(createAtaIx);
         }
 
+        // Add transfer instruction
         const transferIx = typeof (splToken as any).createTransferInstruction === 'function'
           ? (splToken as any).createTransferInstruction(fromAta, toAta, owner, rawAmount)
           : (splToken as any).createTransferCheckedInstruction(fromAta, mintPk, toAta, owner, rawAmount, decimals);
+        instructions.push(transferIx);
 
-        sig = await lz.signAndSendTransaction([transferIx]);
+        // Send all instructions in one transaction
+        sig = await lz.signAndSendTransaction(instructions);
       }
 
       addActivity?.({
