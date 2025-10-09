@@ -1,0 +1,552 @@
+/* stylelint-disable */
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* LazorKit - Mobile-first crypto wallet prototype */
+:root {
+  /* Surfaces */
+  --background: #0E0F12; /* bg-app */
+  --foreground: #ECECF1;
+  --card: #14151B; /* bg-card */
+  --card-foreground: #ECECF1;
+  --popover: #1A1C23; /* bg-elev */
+  --popover-foreground: #ECECF1;
+  /* Brand - Purple Theme */
+  --primary: #7857ff; /* logo purple - main purple */
+  --primary-foreground: #FFFFFF;
+  --secondary: #9B7AFF; /* lighter purple */
+  --secondary-foreground: #0E0F12;
+  --accent: #B89AFF; /* light purple accent */
+  --accent-foreground: #0E0F12;
+  /* Text & UI */
+  --muted: #1A1C23;
+  --muted-foreground: #A8A8B3; /* muted */
+  --subtle-foreground: #7C7D86; /* subtle */
+  --destructive: #EF4444;
+  --destructive-foreground: #0E0F12;
+  --border: #262834; /* borders */
+  --input: #14151B;
+  --ring: #9B7AFF; /* focus ring - purple */
+  /* Charts */
+  --chart-1: #7857ff;
+  --chart-2: #9B7AFF;
+  --chart-3: #B89AFF;
+  --chart-4: #7C7D86;
+  --chart-5: #A8A8B3;
+  /* Radii */
+  --radius: 1rem; /* ~16px, rounded-2xl vibe */
+  /* Sidebar */
+  --sidebar: #14151B;
+  --sidebar-foreground: #ECECF1;
+  --sidebar-primary: #7857ff;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #9B7AFF;
+  --sidebar-accent-foreground: #0E0F12;
+  --sidebar-border: #262834;
+  --sidebar-ring: #9B7AFF;
+
+  /* No gradients - Clean theme */
+}
+
+
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  /* Clean glassmorphism utility classes - no gradients */
+  .glass {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  }
+
+  .glass-card {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  }
+
+  /* Added smooth animations and transitions for better UX */
+  .animate-fade-in {
+    animation: fadeIn 0.4s ease-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.5s ease-out;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.3s ease-out;
+  }
+
+  .animate-pulse-glow {
+    animation: pulseGlow 2s ease-in-out infinite;
+  }
+
+  .animate-bounce-gentle {
+    animation: bounceGentle 2s ease-in-out infinite;
+  }
+
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  .animate-shimmer {
+    animation: shimmer 2s linear infinite;
+  }
+
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes scaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes pulseGlow {
+    0%,
+    100% {
+      box-shadow: 0 0 20px rgba(120, 87, 255, 0.3);
+    }
+    50% {
+      box-shadow: 0 0 30px rgba(120, 87, 255, 0.5);
+    }
+  }
+
+  @keyframes bounceGentle {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-4px);
+    }
+  }
+
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(-8px);
+    }
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: -200px 0;
+    }
+    100% {
+      background-position: calc(200px + 100%) 0;
+    }
+  }
+
+  @keyframes skeleton {
+    0% {
+      background-position: -200px 0;
+    }
+    100% {
+      background-position: calc(200px + 100%) 0;
+    }
+  }
+
+  /* Completely removed interactive-card class to eliminate any potential parsing issues */
+  /* Enhanced interactive states for better feedback - using standard Tailwind classes only */
+  .hover-lift {
+    @apply transition-all duration-200 ease-out;
+  }
+
+  .hover-lift:hover {
+    @apply scale-105 shadow-lg;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+  }
+
+  .hover-lift:active {
+    @apply scale-95;
+  }
+
+  /* Added focus styles for better accessibility */
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+
+  /* Added skeleton loading styles */
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.05) 25%,
+      rgba(255, 255, 255, 0.1) 50%,
+      rgba(255, 255, 255, 0.05) 75%
+    );
+    background-size: 200px 100%;
+    animation: skeleton 1.5s ease-in-out infinite;
+  }
+
+  /* Enhanced app card hover effects */
+  .app-card-hover {
+    @apply transition-all duration-500 ease-out;
+  }
+
+  .app-card-hover:hover {
+    @apply brightness-110;
+    box-shadow: 
+      0 20px 40px rgba(120, 87, 255, 0.15),
+      0 8px 16px rgba(0, 0, 0, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+
+  .app-card-hover:hover .app-image {
+    @apply scale-110;
+  }
+
+  .app-card-hover:hover .app-content {
+    @apply translate-x-1;
+  }
+
+  /* Smooth micro-interactions */
+  .smooth-hover {
+    @apply transition-all duration-300 ease-out;
+  }
+
+  .smooth-hover:hover {
+    @apply scale-105 shadow-lg;
+  }
+
+  .smooth-hover:active {
+    @apply scale-95;
+  }
+
+  /* Button press animation */
+  .button-press {
+    @apply transition-all duration-150 ease-out;
+  }
+
+  .button-press:active {
+    @apply scale-95;
+  }
+
+  /* Card entrance animation */
+  .card-entrance {
+    animation: cardEntrance 0.6s ease-out;
+  }
+
+  @keyframes cardEntrance {
+    from {
+      opacity: 0;
+      transform: translateY(20px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  /* Stagger animation for lists */
+  .stagger-item {
+    animation: staggerItem 0.5s ease-out forwards;
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  .stagger-item:nth-child(1) { animation-delay: 0.1s; }
+  .stagger-item:nth-child(2) { animation-delay: 0.2s; }
+  .stagger-item:nth-child(3) { animation-delay: 0.3s; }
+  .stagger-item:nth-child(4) { animation-delay: 0.4s; }
+  .stagger-item:nth-child(5) { animation-delay: 0.5s; }
+
+  @keyframes staggerItem {
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Smooth loading animation */
+  .smooth-loading {
+    animation: smoothLoading 1.5s ease-in-out infinite;
+  }
+
+  @keyframes smoothLoading {
+    0%, 100% {
+      opacity: 0.6;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.05);
+    }
+  }
+
+  /* Bounce animation for success states */
+  .bounce-success {
+    animation: bounceSuccess 0.6s ease-out;
+  }
+
+  @keyframes bounceSuccess {
+    0% {
+      transform: scale(0.3);
+      opacity: 0;
+    }
+    50% {
+      transform: scale(1.05);
+    }
+    70% {
+      transform: scale(0.9);
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  /* Slide in from right */
+  .slide-in-right {
+    animation: slideInRight 0.4s ease-out;
+  }
+
+  @keyframes slideInRight {
+    from {
+      opacity: 0;
+      transform: translateX(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  /* Slide in from left */
+  .slide-in-left {
+    animation: slideInLeft 0.4s ease-out;
+  }
+
+  @keyframes slideInLeft {
+    from {
+      opacity: 0;
+      transform: translateX(-30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  /* Pulse animation for important elements */
+  .pulse-important {
+    animation: pulseImportant 2s ease-in-out infinite;
+  }
+
+  @keyframes pulseImportant {
+    0%, 100% {
+      box-shadow: 0 0 0 0 rgba(120, 87, 255, 0.4);
+    }
+    50% {
+      box-shadow: 0 0 0 10px rgba(120, 87, 255, 0);
+    }
+  }
+
+  /* Glow effect for verified apps */
+  .verified-glow {
+    position: relative;
+  }
+
+  .verified-glow::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(45deg, #fbbf24, #f59e0b, #d97706);
+    border-radius: inherit;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: -1;
+  }
+
+  .verified-glow:hover::before {
+    opacity: 0.3;
+  }
+
+  /* Shimmer effect for loading states */
+  .shimmer-effect {
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.05) 0%,
+      rgba(255, 255, 255, 0.1) 50%,
+      rgba(255, 255, 255, 0.05) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s ease-in-out infinite;
+  }
+
+  /* Enhanced glassmorphism for app cards - no gradients */
+  .glass-card-enhanced {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 
+      0 8px 32px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  .glass-card-enhanced:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(120, 87, 255, 0.3);
+    box-shadow: 
+      0 20px 40px rgba(120, 87, 255, 0.15),
+      0 8px 16px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+
+  /* Purple glow effect for swap/buy card */
+  .swap-buy-glow {
+    box-shadow: 
+      0 0 30px rgba(120, 87, 255, 0.15),
+      0 0 60px rgba(120, 87, 255, 0.08),
+      0 0 90px rgba(120, 87, 255, 0.05),
+      0 4px 16px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(120, 87, 255, 0.15);
+  }
+
+  /* Mobile-first responsive styles */
+  @media (max-width: 640px) {
+    .glass-card {
+      margin: 0.5rem;
+      border-radius: 0.75rem;
+    }
+    
+    .glass-card-enhanced {
+      margin: 0.5rem;
+      border-radius: 0.75rem;
+    }
+    
+    /* Mobile-specific spacing */
+    .mobile-padding {
+      padding: 1rem;
+    }
+    
+    .mobile-margin {
+      margin: 0.5rem;
+    }
+    
+    /* Mobile text sizes */
+    .mobile-text-sm {
+      font-size: 0.875rem;
+    }
+    
+    .mobile-text-xs {
+      font-size: 0.75rem;
+    }
+    
+    /* Mobile button sizes */
+    .mobile-btn-sm {
+      padding: 0.5rem 0.75rem;
+      font-size: 0.875rem;
+    }
+    
+    /* Mobile input sizes */
+    .mobile-input {
+      padding: 0.75rem;
+      font-size: 1rem;
+    }
+  }
+
+  /* Tablet responsive styles */
+  @media (min-width: 641px) and (max-width: 1024px) {
+    .tablet-padding {
+      padding: 1.5rem;
+    }
+    
+    .tablet-margin {
+      margin: 1rem;
+    }
+  }
+
+  /* Desktop responsive styles */
+  @media (min-width: 1025px) {
+    .desktop-padding {
+      padding: 2rem;
+    }
+    
+    .desktop-margin {
+      margin: 1.5rem;
+    }
+  }
+
+  /* Removed global Radix overrides that caused off-screen and scroll issues */
+
+}
