@@ -62,10 +62,13 @@ export default function AccountPage() {
                     {/* Header */}
                     <div className="flex justify-between items-start mb-4">
                       <div className="flex items-center gap-2">
-                        <div className="w-10 h-10 rounded-lg overflow-hidden border border-purple-500/30 shadow-sm">
+                        <div className="w-10 h-10 rounded-lg overflow-hidden border border-[color:#16ffbb]/30 shadow-sm">
                           <Blockie seed={pubkey || 'demo'} size={8} scale={4} />
                         </div>
-                        <span className="text-purple-500 font-bold text-sm tracking-wide">SOLANA</span>
+                        <div className="flex flex-col leading-tight">
+                          <span className="text-[color:#16ffbb] font-bold text-[10px] tracking-wide">SOLANA</span>
+                          <span className="text-white font-extrabold text-base leading-none">{useWalletStore((s)=>s.walletName) || 'My Wallet'}</span>
+                        </div>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.5)]"></div>
@@ -135,7 +138,10 @@ export default function AccountPage() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-purple-500 font-bold text-xl tracking-wider">LazorKit</p>
+                        <p className="font-bold text-xl tracking-wider">
+                          <span className='text-white'>Ramp</span>
+                          <span className='text-[color:#16ffbb]'>Fi</span>
+                        </p>
                         <p className="text-gray-500 text-xs tracking-wide">Signature</p>
                       </div>
                     </div>

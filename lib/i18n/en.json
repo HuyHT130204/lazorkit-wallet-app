@@ -33,7 +33,7 @@
     "logout": "Logout"
   },
   "app": {
-    "title": "LazorKit",
+    "title": "RampFi",
     "subtitle": "Mobile-first crypto wallet",
     "prototype": "Prototype • No real funds • Rates simulated",
     "demoBadge": "Demo Data • Simulated"

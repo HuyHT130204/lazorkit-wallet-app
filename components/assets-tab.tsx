@@ -261,13 +261,7 @@ export const AssetsTab = () => {
         })}
       </div>
 
-      {/* Activity Section */}
-      <div className='space-y-3'>
-        <h3 className='text-base font-semibold text-muted-foreground'>
-          {t('assets.recentActivity')}
-        </h3>
-        <AssetsActivity />
-      </div>
+      {/* Activity Section removed per requirement */}
 
       {/* Token Detail Modal */}
       {selectedToken && (

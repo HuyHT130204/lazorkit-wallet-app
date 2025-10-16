@@ -51,13 +51,14 @@ export const DrawerNav = ({ open, onOpenChange }: DrawerNavProps) => {
           <div className='flex items-center space-x-3'>
             <div className='w-10 h-10 rounded-lg border border-border/50 overflow-hidden'>
               <img
-                src='/lazorkit-logo.jpg'
-                alt='LazorKit'
+                src='/logo.png'
+                alt='RampFi'
                 className='w-full h-full object-cover'
               />
             </div>
             <SheetTitle className='text-left text-xl font-bold'>
-              {t('app.title')}
+              <span className='text-white'>Ramp</span>
+              <span className='text-[color:#16ffbb]'>Fi</span>
             </SheetTitle>
           </div>
         </SheetHeader>

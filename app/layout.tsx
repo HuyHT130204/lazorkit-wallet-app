@@ -12,9 +12,14 @@ import { LazorkitRootProvider } from '@/components/lazorkit-provider';
 import { WalletSync } from '@/components/wallet-sync';
 
 export const metadata: Metadata = {
-  title: 'LazorKit',
+  title: 'RampFi',
   description: 'Mobile-first crypto wallet prototype',
   generator: 'v0.app',
+  icons: {
+    icon: '/logo.png',
+    shortcut: '/logo.png',
+    apple: '/logo.png',
+  },
 };
 
 export const viewport: Viewport = {

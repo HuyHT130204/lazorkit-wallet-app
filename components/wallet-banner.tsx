@@ -89,7 +89,7 @@ export const WalletBanner = ({
             {/* Header */}
             <div className="flex justify-between items-start mb-4">
               <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-lg overflow-hidden border border-purple-500/30 shadow-sm">
+                <div className="w-10 h-10 rounded-lg overflow-hidden border border-[color:#16ffbb]/30 shadow-sm">
                   <Blockie seed={pubkey || 'demo'} size={8} scale={4} />
                 </div>
                 <span className="text-white font-bold text-sm tracking-wide">SOLANA</span>
@@ -164,7 +164,10 @@ export const WalletBanner = ({
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-purple-400 font-bold text-xl tracking-wider">LazorKit</p>
+                <p className="font-bold text-xl tracking-wider">
+                  <span className='text-white'>Ramp</span>
+                  <span className='text-[color:#16ffbb]'>Fi</span>
+                </p>
                 <p className="text-gray-500 text-xs tracking-wide">Signature</p>
               </div>
             </div>

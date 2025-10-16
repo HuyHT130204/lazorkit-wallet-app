@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Copy, QrCode, Download, Share, Wallet } from 'lucide-react';
 import { Button } from './ui/button';
 import { ViewportModal } from './ui/viewport-modal';
-import { SimpleSelect } from './ui/simple-select';
+// Removed token select and extra chrome to match Phantom-style deposit
 import { CopyButton } from './ui/copy-button';
 import { QRCode } from '@/lib/utils/qr';
 import { useWalletStore, TokenSym } from '@/lib/store/wallet';
@@ -18,10 +18,7 @@ interface DepositModalCompactProps {
 }
 
 export const DepositModalCompact = ({ open, onOpenChange }: DepositModalCompactProps) => {
-  const { pubkey, tokens } = useWalletStore();
-  const [selectedToken, setSelectedToken] = useState<TokenSym>('SOL');
-
-  const selectedTokenData = tokens.find((t) => t.symbol === selectedToken);
+  const { pubkey, walletName } = useWalletStore();
 
   const handleDownloadQR = () => {
     toast({
@@ -38,10 +35,10 @@ export const DepositModalCompact = ({ open, onOpenChange }: DepositModalCompactP
 
     try {
       if (navigator.share && typeof navigator.share === 'function') {
+        // Some browsers reject non-HTTP URLs; include scheme in text only
         await navigator.share({
           title: t('deposit.shareTitle'),
-          text: t('deposit.shareText'),
-          url: `solana:${pubkey}`,
+          text: `${t('deposit.shareText')}\n${pubkey}\nsolana:${pubkey}`,
         });
       } else {
         // Fallback to copy
@@ -108,11 +105,6 @@ export const DepositModalCompact = ({ open, onOpenChange }: DepositModalCompactP
     );
   }
 
-  const tokenOptions = tokens.map((token) => ({
-    value: token.symbol,
-    label: `${token.symbol}`,
-  }));
-
   return (
     <ViewportModal
       open={open}
@@ -121,95 +113,51 @@ export const DepositModalCompact = ({ open, onOpenChange }: DepositModalCompactP
       className="max-w-sm"
     >
       <div className="p-4 space-y-4">
-        {/* Token Selection - Minimal */}
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Wallet className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium text-muted-foreground">
-              {t('deposit.selectToken')}
-            </span>
-          </div>
-          <SimpleSelect
-            value={selectedToken}
-            onValueChange={(value: TokenSym) => setSelectedToken(value)}
-            options={tokenOptions}
-            placeholder={t('deposit.selectToken')}
-            className="h-8"
-          />
-        </div>
-
-        {/* QR Code - Compact */}
-        <div className="space-y-3">
-          <div className="text-center">
-            <h3 className="text-sm font-medium">{t('deposit.scanQRCode')}</h3>
-            <p className="text-xs text-muted-foreground mt-1">
-              {t('deposit.scanQRDesc')}
-            </p>
-          </div>
-          
-          <div className="flex justify-center p-4 bg-white rounded-xl border-2 border-primary/20 shadow-lg">
-            <div className="relative">
+        {/* Big QR full-width */}
+        <div className="space-y-2 flex flex-col items-center">
+          <div className="rounded-xl bg-white p-2 border border-primary/30 shadow-md inline-block">
+            <div className="flex items-center justify-center">
               <QRCode 
                 value={pubkey} 
-                size={120} 
+                size={220}
                 bgColor="#ffffff"
                 fgColor="#000000"
                 level="M"
                 includeMargin={true}
                 marginSize={2}
               />
-              {/* Decorative corner elements */}
-              <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-primary rounded-tl-lg"></div>
-              <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-primary rounded-tr-lg"></div>
-              <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-primary rounded-bl-lg"></div>
-              <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-primary rounded-br-lg"></div>
             </div>
           </div>
-
-          <div className="flex gap-1 justify-center">
-            <Button variant="outline" size="sm" onClick={handleDownloadQR} className="h-7 px-2 text-xs">
-              <Download className="h-3 w-3 mr-1" />
+          <div className="flex gap-2 justify-center">
+            <Button variant="outline" size="sm" onClick={handleDownloadQR} className="h-8 px-3">
+              <Download className="h-4 w-4 mr-1" />
               Download
             </Button>
-            <Button variant="outline" size="sm" onClick={handleShare} className="h-7 px-2 text-xs">
-              <Share className="h-3 w-3 mr-1" />
+            <Button variant="outline" size="sm" onClick={handleShare} className="h-8 px-3">
+              <Share className="h-4 w-4 mr-1" />
               Share
             </Button>
           </div>
         </div>
 
-        {/* Address - Minimal */}
+        {/* Address */}
         <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <QrCode className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium text-muted-foreground">
-              {t('deposit.depositAddress')}
-            </span>
-          </div>
-          <div className="p-2 bg-muted/10 rounded border">
-            <p className="font-mono text-xs break-all text-center">
-              {formatAddress(pubkey, 6, 6)}
+          <span className="text-sm font-medium text-muted-foreground">{t('deposit.depositAddress')}</span>
+          <div className="flex items-center gap-2 p-2 bg-muted/10 rounded border">
+            <p className="text-sm break-all flex-1 text-center">
+              {(walletName || 'MyWallet')} ({formatAddress(pubkey, 4, 4)})
             </p>
+            <Button size="sm" onClick={handleCopyAddress} className="h-8 px-3">
+              <Copy className="h-4 w-4 mr-1" />
+              Copy
+            </Button>
           </div>
+          <p className="text-xs text-muted-foreground text-center">
+            Scan this QR to deposit supported tokens to your wallet address.
+          </p>
         </div>
 
-        {/* Actions - Minimal */}
-        <div className="flex gap-2 pt-1">
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            className="flex-1 h-8 text-xs"
-          >
-            {t('common.close')}
-          </Button>
-          <Button 
-            onClick={handleCopyAddress} 
-            className="flex-1 h-8 text-xs"
-          >
-            <Copy className="h-3 w-3 mr-1" />
-            Copy
-          </Button>
-        </div>
+        {/* Removed bottom Close button; user can close with top-right X */}
       </div>
     </ViewportModal>
   );

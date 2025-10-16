@@ -47,15 +47,16 @@ export const AppHeader = ({
               <ArrowLeft className='h-4 w-4' />
             </Button>
           )}
-          <div className='w-8 h-8 rounded-lg border border-border/50 overflow-hidden'>
+          <div className='h-8 w-auto'>
             <img
-              src='/lazorkit-logo.jpg'
-              alt='LazorKit'
-              className='w-full h-full object-cover'
+              src='/logo.png'
+              alt='RampFi'
+              className='h-8 w-auto object-contain'
             />
           </div>
-          <h1 className='text-xl font-bold text-foreground'>
-            {title || 'LazorKit'}
+          <h1 className='text-xl font-bold'>
+            <span className='text-white'>Ramp</span>
+            <span className='text-[color:#16ffbb]'>Fi</span>
           </h1>
         </div>
 

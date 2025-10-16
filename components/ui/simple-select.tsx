@@ -67,7 +67,7 @@ export const SimpleSelect = ({
         onClick={() => !disabled && setOpen(!open)}
         disabled={disabled}
         className={cn(
-          'flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
+          'flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover:bg-primary/10 hover:border-primary/60 disabled:cursor-not-allowed disabled:opacity-50',
           className
         )}
       >
@@ -93,10 +93,10 @@ export const SimpleSelect = ({
                   key={option.value}
                   onClick={() => handleSelect(option.value)}
                   className={cn(
-                    'relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
-                    value === option.value && 'bg-accent text-accent-foreground'
+                    'relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-primary/20 hover:text-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
+                    value === option.value && 'bg-primary/30 text-foreground'
                   )}
-                  whileHover={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}
+                  whileHover={{}}
                   whileTap={{ scale: 0.98 }}
                 >
                   <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">

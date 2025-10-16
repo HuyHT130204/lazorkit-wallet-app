@@ -43,6 +43,7 @@ export interface WalletState {
   hasPasskey: boolean;
   hasWallet: boolean;
   pubkey?: string;
+  walletName?: string;
   fiat: Fiat;
   rateUsdToVnd: number;
   tokens: TokenHolding[];
@@ -64,6 +65,7 @@ export interface WalletState {
   setHasPasskey: (hasPasskey: boolean) => void;
   setHasWallet: (hasWallet: boolean) => void;
   setPubkey: (pubkey: string) => void;
+  setWalletName: (name: string) => void;
   setTokenAmount?: (symbol: TokenSym, amount: number, priceUsdOverride?: number) => void;
   setFiat: (fiat: Fiat) => void;
   onrampFake: (
@@ -144,6 +146,7 @@ export const useWalletStore = create<WalletState>()(
         hasPasskey: false,
         hasWallet: false,
         pubkey: initialData.pubkey,
+        walletName: 'My Wallet',
         fiat: 'USD',
         rateUsdToVnd: 27000,
         tokens: initialData.tokens,
@@ -200,6 +203,7 @@ export const useWalletStore = create<WalletState>()(
           }
           set({ pubkey });
         },
+        setWalletName: (name: string) => set({ walletName: name }),
         setFiat: (fiat) => set({ fiat }),
         setTokenAmount: (symbol: TokenSym, amount: number, priceUsdOverride?: number) => {
           const state = get();

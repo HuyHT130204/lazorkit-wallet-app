@@ -4,17 +4,13 @@ import { useState } from 'react';
 import {
   Settings,
   Globe,
-  Palette,
-  DollarSign,
-  Shield,
-  Zap,
   Trash2,
   ChevronRight,
   Info,
-  Key,
   Download,
-  RotateCcw,
   Wallet,
+  Check,
+  X as XIcon,
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -27,56 +23,28 @@ import { t } from '@/lib/i18n';
 import { useLanguage } from '@/hooks/use-language';
 import { toast } from '@/hooks/use-toast';
 import { ENV_CONFIG } from '@/lib/config/env';
-import { WalletManager } from './wallet-manager';
+// WalletManager removed per requirement
 
 export const SettingsTab = () => {
-  const { fiat, setFiat, resetDemoData, setHasPasskey, logout } = useWalletStore();
+  const { fiat, setFiat, resetDemoData, setHasPasskey, logout, walletName, setWalletName } = useWalletStore();
 
-  const [walletName, setWalletName] = useState('My Wallet');
   const { language, setLanguage } = useLanguage();
-  const [theme, setTheme] = useState('dark');
   const [passkeyEnabled, setPasskeyEnabled] = useState(true);
   const [minimalDemo, setMinimalDemo] = useState(false);
+  const [pendingName, setPendingName] = useState<string>(walletName || '');
 
   const handleLanguageChange = (newLanguage: string) => {
     setLanguage(newLanguage as 'en' | 'vi');
     console.log('settings_language_changed', { language: newLanguage });
   };
 
-  const handleThemeChange = (newTheme: string) => {
-    setTheme(newTheme);
-    console.log('settings_theme_changed', { theme: newTheme });
-  };
+  // Theme functionality removed
 
   const handleCurrencyChange = (newCurrency: string) => {
     setFiat(newCurrency as 'USD' | 'VND');
   };
 
-  const handleRegeneratePasskey = () => {
-    if (!ENV_CONFIG.ENABLE_DEMO) {
-      toast({
-        title: 'Demo mode disabled',
-        description: 'Passkey functionality is disabled in demo mode.',
-      });
-      return;
-    }
-
-    setHasPasskey(false);
-    setTimeout(() => {
-      setHasPasskey(true);
-      toast({
-        title: 'Passkey regenerated',
-        description: 'Your passkey has been successfully regenerated.',
-      });
-    }, 1000);
-  };
-
-  const handleRequestAirdrop = () => {
-    toast({
-      title: 'Testnet airdrop requested',
-      description: 'This is a demo - no real tokens will be received.',
-    });
-  };
+  // Removed mock passkey/airdrop handlers along with their UI
 
   const handleLogout = () => {
     try {
@@ -105,8 +73,7 @@ export const SettingsTab = () => {
 
   return (
     <div className='space-y-6 pb-6'>
-      {/* Wallet Manager */}
-      <WalletManager />
+      {/* Wallet Manager removed */}
 
       {/* Wallet Settings */}
       <div className='space-y-3'>
@@ -121,13 +88,33 @@ export const SettingsTab = () => {
               <Label htmlFor='walletName' className='text-xs font-medium text-muted-foreground uppercase tracking-wider'>
                 {t('settings.walletName')}
               </Label>
-              <Input
-                id='walletName'
-                value={walletName}
-                onChange={(e) => setWalletName(e.target.value)}
-                className='h-11 bg-background/50 border-border/50 focus:border-primary/50 transition-all'
-                placeholder='Enter wallet name'
-              />
+              <div className='relative'>
+                <Input
+                  id='walletName'
+                  value={pendingName}
+                  onChange={(e) => setPendingName(e.target.value)}
+                  className='h-11 bg-background/50 border-border/50 focus:border-primary/50 pr-20 transition-all'
+                  placeholder='Enter wallet name'
+                />
+                <div className='absolute inset-y-0 right-2 flex items-center gap-1.5'>
+                  <button
+                    type='button'
+                    onClick={() => setWalletName(pendingName.trim())}
+                    className='h-8 w-8 inline-flex items-center justify-center rounded-md border border-border/50 hover:bg-muted/20'
+                    aria-label='Save wallet name'
+                  >
+                    <Check className='h-4 w-4' />
+                  </button>
+                  <button
+                    type='button'
+                    onClick={() => { setPendingName(''); setWalletName(''); }}
+                    className='h-8 w-8 inline-flex items-center justify-center rounded-md border border-border/50 hover:bg-muted/20'
+                    aria-label='Clear wallet name'
+                  >
+                    <XIcon className='h-4 w-4' />
+                  </button>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -164,26 +151,7 @@ export const SettingsTab = () => {
                 </div>
               </div>
 
-              {/* Theme */}
-              <div className='p-4 hover:bg-accent/5 transition-colors'>
-                <div className='flex items-center justify-between gap-4'>
-                  <div className='flex-1 space-y-1'>
-                    <Label className='text-sm font-medium'>{t('settings.theme')}</Label>
-                    <p className='text-xs text-muted-foreground'>Switch between dark and light mode</p>
-                  </div>
-                  <div className='w-32'>
-                    <SimpleSelect
-                      value={theme}
-                      onValueChange={handleThemeChange}
-                      options={[
-                        { value: 'dark', label: t('settings.themes.dark') },
-                        { value: 'light', label: t('settings.themes.light') },
-                      ]}
-                      className='h-10 bg-background/50 border-border/50'
-                    />
-                  </div>
-                </div>
-              </div>
+              {/* Theme section removed */}
 
               {/* Currency */}
               <div className='p-4 hover:bg-accent/5 transition-colors'>
@@ -210,105 +178,7 @@ export const SettingsTab = () => {
         </Card>
       </div>
 
-      {/* Security & Backup */}
-      <div className='space-y-3'>
-        <div className='flex items-center gap-2 px-1'>
-          <Shield className='h-4 w-4 text-primary' />
-          <h3 className='text-sm font-semibold text-foreground'>{t('settings.backupSecurity')}</h3>
-        </div>
-        
-        <Card className='border border-border/50 bg-card/50 backdrop-blur-sm shadow-sm'>
-          <CardContent className='p-0'>
-            <div className='divide-y divide-border/30'>
-              {/* Passkey Status */}
-              <div className='p-4 hover:bg-accent/5 transition-colors'>
-                <div className='flex items-center justify-between'>
-                  <div className='flex items-center gap-3'>
-                    <div className='p-2 rounded-lg bg-primary/10'>
-                      <Key className='h-4 w-4 text-primary' />
-                    </div>
-                    <div className='space-y-0.5'>
-                      <div className='text-sm font-medium'>{t('settings.passkeyStatus')}</div>
-                      <div className='text-xs text-muted-foreground'>
-                        {t('settings.created')}
-                      </div>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={passkeyEnabled}
-                    onCheckedChange={setPasskeyEnabled}
-                  />
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className='p-4 space-y-2'>
-                <Button
-                  variant='outline'
-                  size='sm'
-                  onClick={handleRegeneratePasskey}
-                  className='w-full h-10 justify-start gap-2 hover:bg-accent/10 transition-colors'
-                >
-                  <RotateCcw className='h-4 w-4' />
-                  <span className='flex-1 text-left'>{t('settings.regeneratePasskey')}</span>
-                  <ChevronRight className='h-4 w-4 text-muted-foreground' />
-                </Button>
-                
-                <Button 
-                  variant='outline' 
-                  size='sm' 
-                  className='w-full h-10 justify-start gap-2 hover:bg-accent/10 transition-colors'
-                >
-                  <Download className='h-4 w-4' />
-                  <span className='flex-1 text-left'>{t('settings.exportPublicKey')}</span>
-                  <ChevronRight className='h-4 w-4 text-muted-foreground' />
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Advanced Options */}
-      <div className='space-y-3'>
-        <div className='flex items-center gap-2 px-1'>
-          <Zap className='h-4 w-4 text-primary' />
-          <h3 className='text-sm font-semibold text-foreground'>{t('settings.advanced')}</h3>
-        </div>
-        
-        <Card className='border border-border/50 bg-card/50 backdrop-blur-sm shadow-sm'>
-          <CardContent className='p-0'>
-            <div className='divide-y divide-border/30'>
-              {/* Demo Mode Toggle */}
-              <div className='p-4 hover:bg-accent/5 transition-colors'>
-                <div className='flex items-center justify-between'>
-                  <div className='space-y-0.5'>
-                    <div className='text-sm font-medium'>Rich Demo Mode</div>
-                    <div className='text-xs text-muted-foreground'>
-                      Toggle Minimal Data Mode
-                    </div>
-                  </div>
-                  <Switch checked={minimalDemo} onCheckedChange={setMinimalDemo} />
-                </div>
-              </div>
-
-              {/* Testnet Airdrop */}
-              <div className='p-4'>
-                <Button
-                  variant='outline'
-                  size='sm'
-                  onClick={handleRequestAirdrop}
-                  className='w-full h-10 justify-start gap-2 hover:bg-accent/10 transition-colors'
-                >
-                  <DollarSign className='h-4 w-4' />
-                  <span className='flex-1 text-left'>{t('settings.requestTestnetAirdrop')}</span>
-                  <ChevronRight className='h-4 w-4 text-muted-foreground' />
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Security & Backup and Advanced sections removed (mock features) */}
 
       {/* Danger Zone */}
       <div className='space-y-3'>

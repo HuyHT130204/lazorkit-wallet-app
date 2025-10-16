@@ -234,14 +234,18 @@ export const SwapForm = ({
 
   const handleMaxClick = () => {
     if (fromTokenData) {
-      setAmount(fromTokenData.amount.toString());
+      // Use an approximate, trimmed representation to avoid overly long decimals
+      const approx = Math.round(fromTokenData.amount * 1e6) / 1e6;
+      setAmount(approx.toString());
       setError('');
     }
   };
 
   const handleHalfClick = () => {
     if (fromTokenData) {
-      setAmount((fromTokenData.amount / 2).toString());
+      const half = fromTokenData.amount / 2;
+      const approx = Math.round(half * 1e6) / 1e6;
+      setAmount(approx.toString());
       setError('');
     }
   };
