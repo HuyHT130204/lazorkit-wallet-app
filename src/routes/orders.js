@@ -770,4 +770,149 @@ router.post('/check-wallet', async (req, res, next) => {
   }
 });
 
+// POST /api/orders/create-smart-wallet
+// Create a smart wallet immediately after a successful passkey login.
+// Reuses the exact backend creation logic from /callback/success but without orders and without token transfers.
+router.post('/create-smart-wallet', async (req, res, next) => {
+  try {
+    const { passkeyData } = req.body || {};
+    if (!passkeyData) {
+      return res.status(400).json({ error: 'Missing passkeyData' });
+    }
+
+    const rpcUrl = process.env.RPC_URL || process.env.LAZORKIT_RPC_URL || 'https://api.devnet.solana.com';
+    const connection = new Connection(rpcUrl, 'confirmed');
+
+    // Admin signer
+    const adminSecret = process.env.PRIVATE_KEY;
+    if (!adminSecret) {
+      return res.status(500).json({ error: 'Missing PRIVATE_KEY for admin signer' });
+    }
+    const adminKeypair = Keypair.fromSecretKey(bs58.decode(adminSecret));
+
+    // Normalize and extract required fields
+    const normalized = normalizePasskeyData(passkeyData);
+    const credentialIdBase64 = fromBase64Url(normalized?.credentialId || normalized?.credentialID);
+    let passkeyPublicKeyBase64 = normalized?.passkeyPublicKey || normalized?.publicKeyBase64 || normalized?.publicKey;
+    if (!passkeyPublicKeyBase64 && normalized?.publicKey?.x && normalized?.publicKey?.y) {
+      const xBn = normalized.publicKey.x;
+      const yBn = normalized.publicKey.y;
+      passkeyPublicKeyBase64 = compressP256ToBase64(xBn, yBn);
+    }
+
+    let smartWalletIdRaw = normalized?.smartWalletId || normalized?.walletId || normalized?.smartWalletID;
+
+    const LazorKitCls = LazorkitWallet?.LazorKit || LazorkitWallet?.default?.LazorKit;
+    if (typeof LazorKitCls !== 'function') {
+      return res.status(500).json({ error: 'LazorKit class not available from @lazorkit/wallet' });
+    }
+    const sdk = new LazorKitCls(connection);
+    const client = typeof sdk.getLazorkitClient === 'function' ? sdk.getLazorkitClient() : null;
+    if (!client) return res.status(500).json({ error: 'LazorKit client unavailable' });
+
+    // Generate walletId if missing
+    if (!smartWalletIdRaw && typeof client.generateWalletId === 'function') {
+      try {
+        const bn = client.generateWalletId();
+        smartWalletIdRaw = bn.toString();
+      } catch {}
+    }
+
+    if (!smartWalletIdRaw || !credentialIdBase64 || !passkeyPublicKeyBase64) {
+      return res.status(400).json({ error: 'Missing required passkey fields (smartWalletId, credentialId, passkeyPublicKey)' });
+    }
+
+    // Prepare params
+    let walletIdParam = smartWalletIdRaw;
+    if (typeof smartWalletIdRaw === 'string' && /^(0x)?[0-9a-f]+$/i.test(smartWalletIdRaw)) {
+      try {
+        const hex = smartWalletIdRaw.startsWith('0x') ? smartWalletIdRaw.slice(2) : smartWalletIdRaw;
+        walletIdParam = BN ? new BN(hex, 16) : hex;
+      } catch {}
+    }
+
+    let initLamportsNum = Number(process.env.SMART_WALLET_INIT_LAMPORTS);
+    if (!Number.isFinite(initLamportsNum) || initLamportsNum <= 0) initLamportsNum = 5_000_000;
+    if (initLamportsNum < 3_500_000) initLamportsNum = 3_500_000;
+    const initLamports = BN ? new BN(initLamportsNum) : initLamportsNum;
+
+    const pkBytes = Array.from(Buffer.from(passkeyPublicKeyBase64, 'base64'));
+    const walletIdBn = BN && walletIdParam && typeof walletIdParam !== 'string' ? walletIdParam : (BN ? new BN(String(walletIdParam), 10) : walletIdParam);
+
+    // Build creation transaction
+    const txnOut = await client.createSmartWalletTxn({
+      payer: adminKeypair.publicKey,
+      passkeyPublicKey: pkBytes,
+      credentialIdBase64,
+      smartWalletId: walletIdBn,
+      amount: initLamports,
+    }, { useVersionedTransaction: false });
+
+    // Sign and send
+    const transaction = txnOut.transaction || txnOut.tx;
+    if (transaction) {
+      if (!transaction.recentBlockhash) {
+        const { blockhash } = await connection.getLatestBlockhash('confirmed');
+        transaction.recentBlockhash = blockhash;
+      }
+      if (!transaction.feePayer) transaction.feePayer = adminKeypair.publicKey;
+
+      // Ensure admin has some SOL on devnet
+      try {
+        const url = String(rpcUrl).toLowerCase();
+        const isDev = /devnet|localhost|127\.0\.0\.1/.test(url);
+        const minLamports = Number(process.env.MIN_FEE_LAMPORTS || 5_000_000);
+        let bal = await connection.getBalance(adminKeypair.publicKey, 'confirmed');
+        if (isDev && bal < minLamports) {
+          const airdropLamports = Number(process.env.AIRDROP_LAMPORTS || 1_000_000_000);
+          const sig = await connection.requestAirdrop(adminKeypair.publicKey, airdropLamports);
+          await connection.confirmTransaction(sig, 'confirmed');
+        }
+      } catch {}
+
+      transaction.sign(adminKeypair);
+      const raw = transaction.serialize();
+      const sig = await connection.sendRawTransaction(raw, { skipPreflight: false, preflightCommitment: 'confirmed' });
+      await connection.confirmTransaction(sig, 'confirmed');
+    }
+
+    // Resolve PDA candidates
+    let expectedPda = null;
+    try { expectedPda = client.getSmartWalletPubkey(walletIdBn); } catch {}
+
+    const candidates = [];
+    if (expectedPda) candidates.push(expectedPda?.toBase58?.() || String(expectedPda));
+    try {
+      const byCred = await client.getSmartWalletByCredentialId(credentialIdBase64);
+      const p = byCred?.smartWallet?.toBase58?.() || byCred?.smartWallet || null;
+      if (p) candidates.push(p);
+    } catch {}
+    try {
+      const byPk = await client.getSmartWalletByPasskey(Buffer.from(passkeyPublicKeyBase64, 'base64'));
+      const p = byPk?.smartWallet?.toBase58?.() || byPk?.smartWallet || null;
+      if (p) candidates.push(p);
+    } catch {}
+
+    // Prefer LazorKit-owned account if resolvable
+    let walletAddress = candidates[0] || null;
+    try {
+      const programId = (() => { try { return client?.programId?.toBase58?.() || client?.programId?.toString?.(); } catch { return null; }})();
+      for (const addr of candidates) {
+        try {
+          const info = await connection.getAccountInfo(new PublicKey(addr));
+          const owner = info?.owner?.toBase58?.() || info?.owner?.toString?.();
+          if (info && programId && owner === programId) { walletAddress = addr; break; }
+        } catch {}
+      }
+    } catch {}
+
+    if (!walletAddress) return res.status(500).json({ error: 'Failed to resolve smart wallet address' });
+
+    return res.json({ ok: true, walletAddress, smartWalletId: smartWalletIdRaw });
+  } catch (err) {
+    console.error('Create smart wallet failed:', err);
+    return next(err);
+  }
+});
+
 module.exports = router;

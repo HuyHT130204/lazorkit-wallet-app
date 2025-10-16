@@ -151,7 +151,7 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
     try {
       setIsCreatingOrder(true);
 
-      // Bước 1: Tạo passkey để xác thực
+      // Bước 1: Tạo passkey để xác thực (giữ nguyên để tạo order sau này)
       console.log('🔐 Requesting passkey authentication...');
       if (!wallet?.connectPasskey) {
         throw new Error('Passkey creation not available');
@@ -172,8 +172,7 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
       setPasskeyDataRef(passkeyData);
 
       // Bước 2: Mở preview modal
-      // KHÔNG tạo smart wallet ở FE
-      // Backend sẽ xử lý việc tạo smart wallet khi payment success
+      // Không tạo smart wallet tại đây nữa trong luồng mới (đã chuyển sang /auth)
       const data: OnRampData = {
         fromCurrency,
         toToken,

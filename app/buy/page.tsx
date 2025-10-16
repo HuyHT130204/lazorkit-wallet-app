@@ -64,8 +64,8 @@ export default function BuyPage() {
             />
           )}
 
-          {/* First Time Buyer Section */}
-          {!hasWallet && (
+          {/* First Time Buyer Section disabled in new login-first flow */}
+          {false && (
             <div className='space-y-4 pb-4'>
               {/* Main Buy Section */}
               <div className='text-center'>

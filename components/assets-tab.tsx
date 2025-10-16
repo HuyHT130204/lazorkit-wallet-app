@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { TrendingUp, TrendingDown, Eye, EyeOff, ShoppingCart, Filter, RefreshCcw } from 'lucide-react';
+import { ArrowLeftRight } from 'lucide-react';
 import { Card, CardContent } from './ui/card';
 import { TokenDetailModal } from './token-detail-modal';
 import { useWalletStore, TokenHolding } from '@/lib/store/wallet';
@@ -178,8 +179,12 @@ export const AssetsTab = () => {
           <div className='text-center py-10 border rounded-lg bg-muted/20'>
             <div className='text-sm text-muted-foreground mb-3'>{t('assets.emptyTitle')}</div>
             <div className='text-xs text-muted-foreground mb-4'>{t('assets.emptySubtitle')}</div>
-            <Button size='sm' className='inline-flex items-center gap-1' onClick={() => router.push('/buy')}>
-              <ShoppingCart className='h-4 w-4' />
+            <Button
+              size='sm'
+              onClick={() => router.push('/buy')}
+              className='px-4 h-9 rounded-full text-sm font-medium text-black bg-[#16ffbb] hover:bg-[#16ffbb]/90 shadow-[0_6px_16px_rgba(22,255,187,0.18)] hover:shadow-[0_8px_18px_rgba(22,255,187,0.24)] border-0 transition-all inline-flex items-center gap-2'
+            >
+              <ShoppingCart className='h-4 w-4 text-black' />
               {t('assets.buyCta')}
             </Button>
           </div>
@@ -260,6 +265,25 @@ export const AssetsTab = () => {
           );
         })}
       </div>
+
+      {/* Swap button: show only when user has assets (> 0) */}
+      {!loading && !error && !isNoAssets && (
+        <div className='pt-4'>
+          <div className='flex justify-center'>
+            <Button
+              size='sm'
+              onClick={() => router.push('/buy')}
+              className='px-4 h-9 rounded-full text-sm font-medium text-black bg-[#16ffbb] hover:bg-[#16ffbb]/90 shadow-[0_6px_16px_rgba(22,255,187,0.18)] hover:shadow-[0_8px_18px_rgba(22,255,187,0.24)] border-0 transition-all max-w-[180px]'
+            >
+              <ArrowLeftRight className='h-4 w-4 mr-1 text-black' />
+              Swap tokens
+            </Button>
+          </div>
+          <div className='mt-2 text-center text-[11px] text-muted-foreground'>
+            Exchange your assets instantly with the best available route
+          </div>
+        </div>
+      )}
 
       {/* Activity Section removed per requirement */}
 
