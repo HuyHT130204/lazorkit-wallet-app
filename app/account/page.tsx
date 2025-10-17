@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Send, Plus, Eye, EyeOff, ExternalLink } from 'lucide-react';
 import { AppHeader } from '@/components/app-header';
 import { DrawerNav } from '@/components/drawer-nav';
@@ -24,8 +24,15 @@ export default function AccountPage() {
   const [showBalance, setShowBalance] = useState(true);
   const [sendModalOpen, setSendModalOpen] = useState(false);
   const [depositModalOpen, setDepositModalOpen] = useState(false);
+  const [canShowDevices, setCanShowDevices] = useState(false);
+  const [activeTab, setActiveTab] = useState<'assets' | 'devices' | 'settings'>('assets');
 
   const { pubkey, tokens, fiat, rateUsdToVnd } = useWalletStore();
+
+  // Ensure DevicesTab only renders on client after mount to avoid transient runtime issues
+  useEffect(() => {
+    setCanShowDevices(true);
+  }, []);
 
   const totalBalance = tokens.reduce((sum, token) => {
     const value = token.amount * token.priceUsd;
@@ -174,7 +181,7 @@ export default function AccountPage() {
 
             {/* Content */}
             <div className='w-full'>
-              <Tabs defaultValue='assets' className='w-full'>
+              <Tabs value={activeTab} onValueChange={(v)=>setActiveTab(v as any)} className='w-full'>
                 <TabsList className='w-full h-12 rounded-xl bg-muted/40 p-1 shadow-sm'>
                   <TabsTrigger value='assets' className='flex-1 h-10 text-sm md:text-base'>
                     Assets
@@ -194,7 +201,13 @@ export default function AccountPage() {
                 </TabsContent>
                 <TabsContent value='devices' className='mt-4'>
                   <ErrorBoundary>
-                    <DevicesTab />
+                    {activeTab === 'devices' && canShowDevices && pubkey ? (
+                      <DevicesTab />
+                    ) : (
+                      <div className="text-center py-8">
+                        <p className="text-gray-400 text-sm">{pubkey ? 'Loading devices…' : 'Connect your wallet to manage devices'}</p>
+                      </div>
+                    )}
                   </ErrorBoundary>
                 </TabsContent>
                 <TabsContent value='settings' className='mt-4'>

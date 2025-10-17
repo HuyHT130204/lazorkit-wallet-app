@@ -49,12 +49,12 @@ app.use(express.urlencoded({ extended: true }));
 app.set('trust proxy', true);
 
 // Routes
-const devicesRouter = require('./src/routes/devices');
 const ordersRouter = require('./src/routes/orders');
 const jupiterRouter = require('./src/routes/jupiter');
-app.use('/api/devices', devicesRouter);
+const deviceImportRouter = require('./src/routes/device-import');
 app.use('/api/orders', ordersRouter);
 app.use('/api/jupiter', jupiterRouter);
+app.use('/api/device-import', deviceImportRouter);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

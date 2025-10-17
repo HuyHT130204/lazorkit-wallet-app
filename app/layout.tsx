@@ -6,7 +6,6 @@ import { Analytics } from '@vercel/analytics/next';
 import './globals.css';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/toaster';
-import { DeviceManagerProvider } from '@/components/device-manager-provider';
 import { Suspense } from 'react';
 import { LazorkitRootProvider } from '@/components/lazorkit-provider';
 import { WalletSync } from '@/components/wallet-sync';
@@ -56,11 +55,9 @@ export default function RootLayout({
               enableSystem={false}
               disableTransitionOnChange
             >
-              <DeviceManagerProvider>
-                <WalletSync />
-                {children}
-                <Toaster />
-              </DeviceManagerProvider>
+            <WalletSync />
+            {children}
+            <Toaster />
             </ThemeProvider>
           </LazorkitRootProvider>
         </Suspense>

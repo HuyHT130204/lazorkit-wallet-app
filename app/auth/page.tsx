@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { TokenLogo } from "@/components/ui/token-logo"
@@ -14,6 +14,9 @@ export default function AuthPage() {
   const router = useRouter()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [showQRModal, setShowQRModal] = useState(false)
+  const [qrData, setQRData] = useState<any>(null)
+  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null)
   const { setHasPasskey, setHasWallet, setPubkey } = useWalletStore()
   const wallet = useWallet()
 
@@ -58,9 +61,112 @@ export default function AuthPage() {
   }
 
   const handleImport = async () => {
-    // Placeholder for import flow (e.g., enter existing address)
-    router.push("/account")
+    if (loading) return
+    setLoading(true)
+    try {
+      if (!wallet?.connectPasskey) {
+        throw new Error("Passkey login not available")
+      }
+      const passkeyData = await wallet.connectPasskey()
+      if (!passkeyData) throw new Error("Failed to login with passkey")
+
+      setHasPasskey?.(true)
+
+      // Get device metadata
+      const deviceMetadata = {
+        deviceId: `device_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        userAgent: navigator.userAgent,
+        platform: navigator.platform,
+        screen: {
+          w: window.screen.width,
+          h: window.screen.height
+        },
+        language: navigator.language || navigator.languages?.[0] || 'en-US'
+      }
+
+      // Generate QR code for device import
+      const resp = await fetch(`${apiBase}/api/device-import/generate-qr`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          passkeyData, 
+          deviceMetadata 
+        }),
+      })
+
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({} as any))
+        throw new Error(err?.error || "Failed to generate QR code")
+      }
+      const data = await resp.json()
+      
+      // Store QR data for polling
+      localStorage.setItem('device-import-shareId', data.shareId)
+      localStorage.setItem('device-import-passkeyData', JSON.stringify(passkeyData))
+      
+      // Show QR code modal and start polling
+      setShowQRModal(true)
+      setQRData(data)
+      startPolling(data.shareId)
+      
+    } catch (e: any) {
+      console.error("Import failed:", e)
+      alert(e?.message || "Import failed")
+    } finally {
+      setLoading(false)
+    }
   }
+
+  // Poll for approval status
+  const startPolling = (shareId: string) => {
+    const interval = setInterval(async () => {
+      try {
+        const resp = await fetch(`${apiBase}/api/device-import/status/${shareId}`)
+        if (resp.ok) {
+          const data = await resp.json()
+          if (data.status === 'approved') {
+            // Device approved, get wallet address and login
+            const passkeyDataStr = localStorage.getItem('device-import-passkeyData')
+            let passkeyData: any = {}
+            if (passkeyDataStr && passkeyDataStr !== 'undefined') {
+              try {
+                passkeyData = JSON.parse(passkeyDataStr)
+              } catch (e) {
+                console.warn('Invalid device-import-passkeyData; clearing')
+                try { localStorage.removeItem('device-import-passkeyData') } catch {}
+              }
+            }
+            setHasWallet?.(true)
+            setPubkey?.(data.walletAddress)
+            localStorage.removeItem('device-import-shareId')
+            localStorage.removeItem('device-import-passkeyData')
+            clearInterval(interval)
+            setPollingInterval(null)
+            setShowQRModal(false)
+            router.replace("/account")
+          } else if (data.status === 'rejected' || data.status === 'expired') {
+            clearInterval(interval)
+            setPollingInterval(null)
+            setShowQRModal(false)
+            alert('Device connection was rejected or expired')
+          }
+        }
+      } catch (e) {
+        console.error('Polling error:', e)
+      }
+    }, 2000) // Poll every 2 seconds
+    
+    setPollingInterval(interval)
+  }
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingInterval) {
+        clearInterval(pollingInterval)
+      }
+    }
+  }, [pollingInterval])
 
   // Use TokenLogo component (same as swap) for background tokens
   const tokens = ["SOL", "ORCA", "JitoSOL", "USDC", "USDT", "BONK", "RAY", "JUP"]
@@ -128,6 +234,48 @@ export default function AuthPage() {
           </div>
         </div>
       </main>
+
+      {/* QR Code Modal */}
+      {showQRModal && qrData && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-700 rounded-2xl p-6 max-w-sm w-full text-center">
+            <h3 className="text-xl font-bold text-white mb-4">Connect to Existing Wallet</h3>
+            <p className="text-gray-300 mb-6 text-sm">
+              Scan this QR code with your existing device to connect this device to your wallet
+            </p>
+            
+            <div className="mb-6 flex justify-center">
+              <div className="relative">
+                <img 
+                  src={qrData?.qrCode} 
+                  alt="Device Import QR Code"
+                  className="w-64 h-64 rounded-lg border-2 border-[#16ffbb]/50 shadow-lg"
+                />
+                <div className="absolute inset-0 border-2 border-[#16ffbb] rounded-lg pointer-events-none animate-pulse"></div>
+              </div>
+            </div>
+            
+            <div className="space-y-3">
+              <p className="text-xs text-gray-400 bg-gray-800/50 rounded-lg p-2">
+                Expires in: {qrData?.expiresAt ? Math.ceil((new Date(qrData.expiresAt).getTime() - new Date().getTime()) / 1000 / 60) : 0} minutes
+              </p>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setShowQRModal(false)
+                  if (pollingInterval) {
+                    clearInterval(pollingInterval)
+                    setPollingInterval(null)
+                  }
+                }}
+                className="w-full border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

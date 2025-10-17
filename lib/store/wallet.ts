@@ -125,6 +125,20 @@ const checkEnvironmentChange = () => {
   const currentEnv = ENV_CONFIG.ENABLE_DEMO.toString();
   const storedEnv = localStorage.getItem(envKey);
 
+  // Proactively clear corrupted persisted state that would break JSON.parse during hydration
+  try {
+    const persistedRaw = localStorage.getItem(storageKey);
+    if (persistedRaw === 'undefined') {
+      localStorage.removeItem(storageKey);
+    } else if (persistedRaw) {
+      try {
+        JSON.parse(persistedRaw);
+      } catch {
+        localStorage.removeItem(storageKey);
+      }
+    }
+  } catch {}
+
   if (storedEnv && storedEnv !== currentEnv) {
     // Environment changed, clear the wallet storage
     localStorage.removeItem(storageKey);

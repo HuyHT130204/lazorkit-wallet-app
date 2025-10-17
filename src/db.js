@@ -39,23 +39,14 @@ const connectDB = async () => {
       console.warn('Unable to verify/drop legacy TTL index on orders.expiresAt:', e?.message || e);
     }
 
-    // Ensure devices collection does not keep a legacy unique index on deviceId
+    // Create device shares collection indexes
     try {
-      const devicesCol = mongoose.connection.db.collection('devices');
-      const dIndexes = await devicesCol.indexes();
-      for (const idx of dIndexes) {
-        const isDeviceId = idx.key && idx.key.deviceId === 1;
-        const isUnique = Boolean(idx.unique);
-        if (isDeviceId && isUnique) {
-          console.warn(`⚠️  Dropping legacy UNIQUE index on devices.deviceId: ${idx.name}`);
-          await devicesCol.dropIndex(idx.name);
-        }
-      }
-      // Create compound unique index and non-unique deviceId index as safety
-      await devicesCol.createIndex({ userId: 1, deviceId: 1 }, { unique: true });
-      await devicesCol.createIndex({ deviceId: 1 }, { unique: false });
+      const deviceSharesCol = mongoose.connection.db.collection('deviceshares');
+      await deviceSharesCol.createIndex({ shareId: 1 }, { unique: true });
+      await deviceSharesCol.createIndex({ walletAddress: 1, status: 1 });
+      await deviceSharesCol.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
     } catch (e) {
-      console.warn('Unable to verify/drop legacy unique index on devices.deviceId:', e?.message || e);
+      console.warn('Unable to create device shares indexes:', e?.message || e);
     }
   } catch (error) {
     console.error('MongoDB connection error:', error);

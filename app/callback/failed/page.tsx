@@ -27,9 +27,16 @@ export default function FailedCallbackPage() {
     (async () => {
       try {
         const stored = typeof window !== 'undefined' ? localStorage.getItem('lazorkit-passkey-data') : null;
-        if (!stored) return;
-        
-        const passkeyData = JSON.parse(stored);
+        if (!stored || stored === 'undefined') return;
+
+        let passkeyData: any = {};
+        try {
+          passkeyData = JSON.parse(stored);
+        } catch (e) {
+          console.warn('Invalid passkey data in storage, clearing:', e);
+          try { localStorage.removeItem('lazorkit-passkey-data'); } catch {}
+          return;
+        }
         const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
         const resp = await fetch(`${apiBase}/api/orders/check-wallet`, {
           method: 'POST',
