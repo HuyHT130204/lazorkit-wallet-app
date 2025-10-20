@@ -24,9 +24,11 @@ const parseAllowedOrigins = () => {
 };
 
 const allowedOrigins = parseAllowedOrigins();
+console.log('🔧 CORS allowed origins:', allowedOrigins);
 
 app.use(cors({
   origin: (origin, callback) => {
+    console.log('🌐 CORS request from origin:', origin);
     if (!origin) return callback(null, true); // allow server-to-server / curl
     const ok = allowedOrigins.some((o) => {
       if (o === origin) return true;
@@ -34,6 +36,7 @@ app.use(cors({
       if (o.startsWith('https://*.') && origin.endsWith(o.slice('https://*.'.length))) return true;
       return false;
     });
+    console.log('✅ CORS allowed:', ok, 'for origin:', origin);
     callback(ok ? null : new Error('CORS not allowed'), ok);
   },
   credentials: true,
