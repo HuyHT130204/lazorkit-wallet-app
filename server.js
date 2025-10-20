@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const http = require('http');
 const https = require('https');
 const { connectDB } = require('./src/db');
 const { startCronJob } = require('./src/utils/cron');
@@ -85,7 +86,7 @@ app.use((req, res) => {
   });
 });
 
-// Start server (HTTPS enforced)
+// Start server (HTTPS for dev, HTTP for production)
 const startServer = async () => {
   try {
     await connectDB();
@@ -95,29 +96,44 @@ const startServer = async () => {
     // Do not exit; routes will use in-memory storage when DB is unavailable
   }
 
-  const keyPath = process.env.SSL_KEY_PATH || path.resolve(__dirname, 'certs', 'localhost.key');
-  const certPath = process.env.SSL_CERT_PATH || path.resolve(__dirname, 'certs', 'localhost.crt');
+  const isProduction = process.env.NODE_ENV === 'production';
+  
+  if (isProduction) {
+    // Production: Use HTTP (Render handles HTTPS termination)
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`🌐 HTTP API Server running on port ${PORT}`);
+      console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
+      console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
 
-  let key;
-  let cert;
-  try {
-    key = fs.readFileSync(keyPath);
-    cert = fs.readFileSync(certPath);
-  } catch (e) {
-    console.error('❌ SSL certificates not found. Expected at:', { keyPath, certPath });
-    console.error('Please generate local trusted certs (e.g., with mkcert) and set SSL_KEY_PATH/SSL_CERT_PATH.');
-    process.exit(1);
+      // Start cron job for expired orders
+      startCronJob();
+    });
+  } else {
+    // Development: Use HTTPS with local certificates
+    const keyPath = process.env.SSL_KEY_PATH || path.resolve(__dirname, 'certs', 'localhost.key');
+    const certPath = process.env.SSL_CERT_PATH || path.resolve(__dirname, 'certs', 'localhost.crt');
+
+    let key;
+    let cert;
+    try {
+      key = fs.readFileSync(keyPath);
+      cert = fs.readFileSync(certPath);
+    } catch (e) {
+      console.error('❌ SSL certificates not found. Expected at:', { keyPath, certPath });
+      console.error('Please generate local trusted certs (e.g., with mkcert) and set SSL_KEY_PATH/SSL_CERT_PATH.');
+      process.exit(1);
+    }
+
+    const httpsServer = https.createServer({ key, cert }, app);
+    httpsServer.listen(PORT, () => {
+      console.log(`🔐 HTTPS API Server running on https://localhost:${PORT}`);
+      console.log(`📊 Health check: https://localhost:${PORT}/api/health`);
+      console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
+
+      // Start cron job for expired orders
+      startCronJob();
+    });
   }
-
-  const httpsServer = https.createServer({ key, cert }, app);
-  httpsServer.listen(PORT, () => {
-    console.log(`🔐 HTTPS API Server running on https://localhost:${PORT}`);
-    console.log(`📊 Health check: https://localhost:${PORT}/api/health`);
-    console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
-
-    // Start cron job for expired orders
-    startCronJob();
-  });
 };
 
 // Handle uncaught exceptions
