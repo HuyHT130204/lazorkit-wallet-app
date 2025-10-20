@@ -16,12 +16,13 @@ interface UnifiedTradeFormProps {
 export const UnifiedTradeForm = ({ tokenData }: UnifiedTradeFormProps) => {
   const getTokenAmount = useWalletStore((s) => s.getTokenAmount);
   const tokens = useWalletStore((s) => s.tokens);
+  const hasAssets = useWalletStore((s) => s.hasAssets?.());
   const refreshBalances = useWalletStore((s) => s.refreshBalances);
 
-  // Derive current USDC balance from store safely
-  const usdcBalance = getTokenAmount
-    ? getTokenAmount('USDC' as any)
-    : (tokens.find((t: any) => t.symbol === 'USDC')?.amount || 0);
+  // Derive current BTC balance; fallback to any assets presence
+  const btcBalance = getTokenAmount
+    ? getTokenAmount('BTC' as any)
+    : (tokens.find((t: any) => t.symbol === 'BTC')?.amount || 0);
 
   const [mode, setMode] = useState<Mode>('buy');
   const [swapInit, setSwapInit] = useState<{ fromToken?: any; toToken?: any } | null>(null);
@@ -35,19 +36,19 @@ export const UnifiedTradeForm = ({ tokenData }: UnifiedTradeFormProps) => {
     }
   }, [refreshBalances]);
 
-  // Auto decide default mode: if USDC balance > 0 → swap USDC->SOL, else buy USD->USDC
+  // Auto decide default mode: if wallet has any assets → swap BTC->SOL, else buy USD->BTC (mock)
   useEffect(() => {
     if (autoApplied) return; // don't override if already applied or user changed
 
-    if (usdcBalance && usdcBalance > 0) {
+    if ((btcBalance && btcBalance > 0) || hasAssets) {
       setMode('swap');
-      setSwapInit({ fromToken: 'USDC', toToken: 'SOL' });
+      setSwapInit({ fromToken: 'BTC' as any, toToken: 'SOL' });
     } else {
       setMode('buy');
       setBuyInitFiat('USD');
     }
     setAutoApplied(true);
-  }, [usdcBalance, autoApplied]);
+  }, [btcBalance, hasAssets, autoApplied]);
 
   return (
     <div className='bg-card'>

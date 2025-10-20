@@ -8,7 +8,7 @@ export default function Home() {
   const hasWallet = useWalletStore((s) => s.hasWallet);
 
   useEffect(() => {
-    if (!hasWallet) router.replace('/auth');
+    if (!hasWallet) router.replace('/buy');
     else router.replace('/account');
   }, [hasWallet, router]);
 

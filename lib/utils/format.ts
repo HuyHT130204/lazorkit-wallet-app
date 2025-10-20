@@ -123,7 +123,7 @@ export const convertCurrency = (
 export const validateAmount = (
   amount: number,
   min: number = 20,
-  max: number = 500
+  max: number = 500000
 ): boolean => {
   return amount >= min && amount <= max;
 };

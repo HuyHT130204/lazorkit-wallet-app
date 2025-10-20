@@ -80,11 +80,14 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
       ? amountNum
       : convertCurrency(amountNum, 'VND', 'USD', 27000);
 
+  // Mock BTC in buy flow (UI-only)
+  const isMockBTC = true;
+  const mockBtcPriceUsd = 110956; // mock BTC price in USD (updated)
   const tokenJupiterData = tokenData?.get(toToken);
-  const tokenPrice = tokenJupiterData?.usdPrice || 1;
+  const tokenPrice = isMockBTC ? mockBtcPriceUsd : (tokenJupiterData?.usdPrice || 1);
   const estimatedReceive = amountUsd / tokenPrice;
 
-  const quickAmounts = [50, 100, 200, 500];
+  const quickAmounts = [50000, 100000, 200000, 500000];
 
   const ICON_OVERRIDES: Partial<Record<TokenSym, string>> = {
     // Use CoinGecko CDN (allows hotlinking) to avoid 403 from cryptologos
@@ -99,6 +102,14 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
   };
 
   const getTokenIcon = (symbol: string) => {
+    // Override icon with bitcoin logo when mocking BTC
+    if (isMockBTC && symbol === toToken) {
+      return (
+        <div className='relative w-5 h-5'>
+          <img src='/bitcoin-btc-logo.png' alt='BTC' className='absolute inset-0 w-full h-full rounded-full object-cover' />
+        </div>
+      );
+    }
     const token = tokenData?.get(symbol);
     const override = ICON_OVERRIDES[symbol as TokenSym];
     return (
@@ -281,7 +292,7 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
                   <div className='flex items-center'>
                     {getTokenIcon(toToken)}
                   </div>
-                  <span className='font-medium text-sm'>{toToken}</span>
+                  <span className='font-medium text-sm'>{isMockBTC ? 'BTC' : toToken}</span>
                   <ChevronDown className='h-3 w-3 text-muted-foreground' />
                 </button>
               </div>
@@ -289,7 +300,7 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
               <div className='flex-1 ml-3 text-right'>
                 <div className='mb-1'>
                   <span className='text-xs text-muted-foreground'>
-                    {t('common.price')}: 1 {toToken} = ${tokenPrice?.toFixed(4) || '1.00'}
+                    {t('common.price')}: 1 {isMockBTC ? 'BTC' : toToken} = ${tokenPrice?.toFixed(2) || '1.00'}
                   </span>
                 </div>
                 <div className='text-2xl font-semibold text-muted-foreground/50'>
@@ -531,12 +542,13 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
             </div>
 
             <div className='p-3 space-y-1.5'>
-              {(['USDC', 'USDT'] as TokenSym[]).map((token, index) => {
+              {(['USDC'] as TokenSym[]).map((token, index) => {
                 const jupiterToken = tokenData?.get(token);
                 return (
                   <button
                     key={token}
                     onClick={() => {
+                      // keep state but mock UI as BTC
                       setToToken(token);
                       setShowTokenSelect(false);
                     }}
@@ -550,18 +562,10 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center overflow-hidden relative ${
                       token === toToken ? 'bg-primary/20 ring-2 ring-primary/30' : 'bg-background/50'
                     }`}>
-                      <TokenLogo symbol={token} size={24} />
-                      <img
-                        src={(jupiterToken?.icon as string) || ICON_OVERRIDES[token] || ''}
-                        alt={token}
-                        className='absolute inset-0 w-full h-full object-cover'
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                        }}
-                      />
+                      <img src='/bitcoin-btc-logo.png' alt='BTC' className='absolute inset-0 w-full h-full object-cover' />
                     </div>
                     <div className='flex-1 text-left'>
-                      <div className='font-semibold text-sm'>{token}</div>
+                      <div className='font-semibold text-sm'>BTC</div>
                       {(
                         jupiterToken?.id ||
                         (TOKEN_ADDRESSES as Record<string, string>)[token]
@@ -608,11 +612,9 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
             }
 
             const subtotal = Number(amountUsd.toFixed(2));
-            const fee = Math.max(0.3, subtotal * 0.029);
-            const feeRounded = Number(fee.toFixed(2));
-            const network = 0.01;
-            const networkRounded = Number(network.toFixed(2));
-            const total = Number((subtotal + feeRounded + networkRounded).toFixed(2));
+            const fee = 1.00; // Fixed $1 fee for all transactions
+            const network = 0.00; // No network fee
+            const total = Number((subtotal + fee).toFixed(2));
 
             console.log('💳 Creating order with passkey data:', {
               credentialId: passkeyData.credentialId?.slice(0, 10) + '...',
@@ -620,21 +622,22 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
             });
 
             const res = await createWhateeOrder({
-              amount: total,
+              amount: subtotal, // Send subtotal (original amount) instead of total
               currency: fromCurrency,
               description: `Buy ${toToken} via Lazorkit`,
               metadata: { 
                 toToken, 
                 subtotal: String(subtotal), 
-                fee: String(feeRounded), 
-                network: String(networkRounded) 
+                fee: String(fee),
+                total: String(total), // Keep total in metadata for reference
+                network: String(network) 
               },
               token: toToken,
               passkeyData,
               orderLines: [
                 { key: 'subtotal', title: 'Subtotal', quantity: 1, unit_price: subtotal, amount: subtotal },
-                { key: 'fee', title: 'Fee', quantity: 1, unit_price: feeRounded, amount: feeRounded },
-                { key: 'network', title: 'Est. network fee', quantity: 1, unit_price: networkRounded, amount: networkRounded },
+                { key: 'fee', title: 'Fee', quantity: 1, unit_price: fee, amount: fee },
+                { key: 'network', title: 'Est. network fee', quantity: 1, unit_price: network, amount: network },
               ],
             });
 

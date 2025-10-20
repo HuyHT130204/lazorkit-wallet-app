@@ -224,45 +224,48 @@ export const useWalletStore = create<WalletState>()(
           console.log('setTokenAmount called:', { symbol, amount, priceUsdOverride });
           console.log('Current tokens:', state.tokens.map(t => ({ symbol: t.symbol, amount: t.amount })));
           const idx = state.tokens.findIndex((t) => t.symbol === symbol);
+          const next = [...state.tokens];
           if (idx >= 0) {
-            // Update existing token
-            const next = [...state.tokens];
+            // Add to existing amount (original behavior)
             next[idx] = {
               ...next[idx],
-              amount,
+              amount: (next[idx].amount || 0) + amount,
               ...(priceUsdOverride != null ? { priceUsd: priceUsdOverride } : {}),
             } as any;
-            console.log('Updated existing token:', next[idx]);
-            set({ tokens: next });
-            console.log('Tokens after update:', next.map(t => ({ symbol: t.symbol, amount: t.amount })));
           } else {
             // Create new token if not found
-            console.log('Token not found, creating new token:', symbol);
-            const newToken = {
+            next.push({
               symbol,
               amount,
               priceUsd: priceUsdOverride ?? 1,
               change24hPct: 0,
               mint: TOKEN_ADDRESSES[symbol as keyof typeof TOKEN_ADDRESSES] || '',
-            } as any;
-            const next = [...state.tokens, newToken];
-            set({ tokens: next });
-            console.log('Created new token:', newToken);
-            console.log('Tokens after creation:', next.map(t => ({ symbol: t.symbol, amount: t.amount })));
+            } as any);
           }
+          set({ tokens: next });
+          console.log('Tokens after setTokenAmount:', next.map(t => ({ symbol: t.symbol, amount: t.amount })));
         },
 
         onrampFake: (amount, fiat, token, orderId) => {
           const state = get();
           const tokenIndex = state.tokens.findIndex((t) => t.symbol === token);
+          const next = [...state.tokens];
           if (tokenIndex >= 0) {
-            const newTokens = [...state.tokens];
-            newTokens[tokenIndex] = {
-              ...newTokens[tokenIndex],
-              amount: newTokens[tokenIndex].amount + amount,
-            };
-            set({ tokens: newTokens });
+            // Overwrite amount (not additive) for onramp success to avoid accumulation across runs
+            next[tokenIndex] = {
+              ...next[tokenIndex],
+              amount,
+            } as any;
+          } else {
+            next.push({
+              symbol: token,
+              amount,
+              priceUsd: 1,
+              change24hPct: 0,
+              mint: TOKEN_ADDRESSES[token as keyof typeof TOKEN_ADDRESSES] || ''
+            } as any);
           }
+          set({ tokens: next });
 
           const newActivity: Activity = {
             id: Date.now().toString(),
@@ -447,6 +450,10 @@ export const useWalletStore = create<WalletState>()(
                     });
                   }
                 });
+
+                // Remove any mock/demo-only tokens (e.g., BTC) or tokens not returned by backend
+                const backendSymbols = new Set(Object.keys(backendData.balances));
+                nextTokens = nextTokens.filter(t => backendSymbols.has(t.symbol));
                 
                 console.log('📋 Final tokens array:', nextTokens);
                 set({ tokens: nextTokens });

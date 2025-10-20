@@ -198,8 +198,14 @@ router.post('/', async (req, res, next) => {
 
     const reference = `lz_${Date.now()}`;
 
-    const returnSuccess = `${process.env.APP_BASE_URL || 'https://localhost:3000'}/callback/success?status=success&ref=${encodeURIComponent(reference)}&token=${encodeURIComponent(token || '')}&currency=${encodeURIComponent(currency)}&amount=${encodeURIComponent(amount)}`;
-    const returnFailed = `${process.env.APP_BASE_URL || 'https://localhost:3000'}/callback/failed?status=failed&ref=${encodeURIComponent(reference)}&token=${encodeURIComponent(token || '')}&currency=${encodeURIComponent(currency)}&amount=${encodeURIComponent(amount)}`;
+    // Calculate fee (fixed $1.00 for all transactions)
+    const subtotal = Number(Number(amount).toFixed(2));
+    const fee = 1.00; // Fixed $1 fee for all transactions
+    const networkFee = 0.00; // No network fee
+    const total = Number((subtotal + fee).toFixed(2));
+
+    const returnSuccess = `${process.env.APP_BASE_URL || 'https://localhost:3000'}/callback/success?status=success&ref=${encodeURIComponent(reference)}&token=${encodeURIComponent(token || '')}&currency=${encodeURIComponent(currency)}&amount=${encodeURIComponent(total)}&subtotal=${encodeURIComponent(subtotal)}`;
+    const returnFailed = `${process.env.APP_BASE_URL || 'https://localhost:3000'}/callback/failed?status=failed&ref=${encodeURIComponent(reference)}&token=${encodeURIComponent(token || '')}&currency=${encodeURIComponent(currency)}&amount=${encodeURIComponent(total)}&subtotal=${encodeURIComponent(subtotal)}`;
 
     const providerUrl = process.env.WHATEE_API_URL || 'https://onecheckout.sandbox.whatee.io/api/v1.0/orders';
     const providerKey = process.env.WHATEE_API_KEY || '';
@@ -207,7 +213,7 @@ router.post('/', async (req, res, next) => {
 
     const body = {
       merchantId,
-      amount: Number(Number(amount).toFixed(2)),
+      amount: Number(Number(amount).toFixed(2)), // This is the subtotal amount
       currency,
       reference,
       description: `Buy ${token || ''} via LazorKit`,
@@ -240,14 +246,19 @@ router.post('/', async (req, res, next) => {
         key: String(l.key || 'item'),
         title: String(l.title || `Buy ${token || 'Token'}`),
         quantity: Number(l.quantity || 1),
-        unit_price: Number(l.unit_price ?? amount),
-        amount: Number(l.amount ?? amount),
+        unit_price: Number(l.unit_price ?? subtotal),
+        amount: Number(l.amount ?? subtotal),
       }));
     } else {
       body.order_lines = [
-        { key: 'onramp', title: `Buy ${token || ''}`, quantity: 1, unit_price: Number(Number(amount).toFixed(2)), amount: Number(Number(amount).toFixed(2)) },
+        { key: 'onramp', title: `Buy ${token || ''}`, quantity: 1, unit_price: subtotal, amount: subtotal },
+        { key: 'fee', title: 'Processing Fee', quantity: 1, unit_price: fee, amount: fee },
+        { key: 'network', title: 'Network Fee', quantity: 1, unit_price: networkFee, amount: networkFee },
       ];
     }
+
+    // Update the total amount for payment
+    body.amount = total;
 
     const payload = { ...body };
     console.log('[orders.create] Creating order with reference:', reference);
@@ -608,7 +619,9 @@ router.post('/callback/success', async (req, res, next) => {
     try {
       const shouldTransfer = Boolean(process.env.TOKEN_MINT) && Boolean(process.env.PRIVATE_KEY);
       if (shouldTransfer) {
-        const tokenAmount = Number(order.amount);
+        // Use subtotal for token transfer (exclude fees)
+        const subtotal = order.metadata?.find(m => m.key === 'subtotal')?.value || order.amount;
+        const tokenAmount = Number(subtotal);
         creditedAmount = tokenAmount;
         
         console.log('[callback/success] Transferring tokens:', {

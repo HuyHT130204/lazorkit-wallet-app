@@ -61,7 +61,7 @@ export const SwapForm = ({
   onSwitchToBuy,
 }: SwapFormProps) => {
   const { tokens, swapReal } = useWalletStore();
-  const [fromToken, setFromToken] = useState<TokenSym>(initialFromToken || 'USDC');
+  const [fromToken, setFromToken] = useState<TokenSym>(initialFromToken || ('BTC' as any));
   const [toToken, setToToken] = useState<TokenSym>(initialToToken || 'SOL');
   const [amount, setAmount] = useState('');
   const [slippage, setSlippage] = useState(1);
@@ -85,6 +85,15 @@ export const SwapForm = ({
   const fromTokenData = tokens.find((t) => t.symbol === fromToken);
   const toTokenData = tokens.find((t) => t.symbol === toToken);
   const amountNum = parseFloat(amount) || 0;
+
+  // Mocked BTC price for demo
+  const mockBtcPriceUsd = 110956;
+
+  // Resolve effective from balance (support BTC mock by deriving from USDC balance)
+  const usdcToken = tokens.find((t) => t.symbol === 'USDC');
+  const fromBalanceAmount = fromToken === ('BTC' as any)
+    ? (usdcToken ? (usdcToken.amount / mockBtcPriceUsd) : 0)
+    : (fromTokenData?.amount || 0);
 
   // Fetch Jupiter quote when amount or tokens change
   useEffect(() => {
@@ -149,7 +158,14 @@ export const SwapForm = ({
       SOL: 'https://assets.coingecko.com/coins/images/4128/standard/solana.png',
     };
     const px = size;
+    if (symbol === ('BTC' as any)) {
       return (
+        <div className='relative' style={{ width: px, height: px }}>
+          <img src='/bitcoin-btc-logo.png' alt='BTC' className='absolute inset-0 w-full h-full rounded-full object-cover' />
+        </div>
+      );
+    }
+    return (
       <div className='relative' style={{ width: px, height: px }}>
         <TokenLogo symbol={symbol} size={size} />
         {(token?.icon || overrides[symbol]) && (
@@ -163,11 +179,12 @@ export const SwapForm = ({
           />
         )}
       </div>
-      );
+    );
   };
 
   // Get price from Jupiter data or fallback to local data
   const getTokenPrice = (symbol: string) => {
+    if (symbol === ('BTC' as any)) return mockBtcPriceUsd;
     const jupiterToken = tokenData?.get(symbol);
     if (jupiterToken?.usdPrice) {
       return jupiterToken.usdPrice;
@@ -206,7 +223,7 @@ export const SwapForm = ({
       return false;
     }
 
-    if (!fromTokenData || amountNum > fromTokenData.amount) {
+    if (amountNum > fromBalanceAmount) {
       setError(t('swap.insufficientBalance'));
       return false;
     }
@@ -233,21 +250,17 @@ export const SwapForm = ({
   };
 
   const handleMaxClick = () => {
-    if (fromTokenData) {
-      // Use an approximate, trimmed representation to avoid overly long decimals
-      const approx = Math.round(fromTokenData.amount * 1e6) / 1e6;
-      setAmount(approx.toString());
-      setError('');
-    }
+    // Use an approximate, trimmed representation to avoid overly long decimals
+    const approx = Math.round(fromBalanceAmount * 1e6) / 1e6;
+    setAmount(approx.toString());
+    setError('');
   };
 
   const handleHalfClick = () => {
-    if (fromTokenData) {
-      const half = fromTokenData.amount / 2;
-      const approx = Math.round(half * 1e6) / 1e6;
-      setAmount(approx.toString());
-      setError('');
-    }
+    const half = fromBalanceAmount / 2;
+    const approx = Math.round(half * 1e6) / 1e6;
+    setAmount(approx.toString());
+    setError('');
   };
 
   const handleSwapTokens = () => {
@@ -281,7 +294,7 @@ export const SwapForm = ({
   };
 
   // Get available tokens that we have data for
-  const availableTokens = ['SOL', 'USDC', 'USDT', 'BONK', 'RAY', 'JUP', 'ORCA', 'mSOL', 'JitoSOL', 'PYTH'] as TokenSym[];
+  const availableTokens = ['SOL', 'BTC' as any, 'USDC', 'USDT', 'BONK', 'RAY', 'JUP', 'ORCA', 'mSOL', 'JitoSOL', 'PYTH'] as TokenSym[];
   const fiatOptions: Array<'USD' | 'VND'> = ['USD', 'VND'];
 
   // Filter tokens based on search
@@ -332,12 +345,10 @@ export const SwapForm = ({
               {/* Right side - Balance, buttons and input */}
               <div className='flex-1 ml-3 text-right'>
                 <div className='flex items-center justify-end gap-1.5 mb-1 h-4'>
-                  {fromTokenData && (
-                    <span className='text-xs text-muted-foreground whitespace-nowrap'>
-                      {formatBalance(fromTokenData.amount, fromToken)}
-                    </span>
-                  )}
-                  {fromTokenData && fromTokenData.amount > 0 && (
+                  <span className='text-xs text-muted-foreground whitespace-nowrap'>
+                    {formatBalance(fromBalanceAmount, fromToken)}
+                  </span>
+                  {fromBalanceAmount > 0 && (
                     <>
                       <button
                         onClick={handleHalfClick}

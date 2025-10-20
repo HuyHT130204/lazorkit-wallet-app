@@ -32,9 +32,9 @@ export function OnRampPreviewModal({
 
   const breakdown = useMemo(() => {
     const subtotal = data.amount;
-    const fee = Math.max(0.3, subtotal * 0.029); // 2.9% + $0.30 minimum
-    const network = 0.01; // demo network fee
-    const total = subtotal + fee + network;
+    const fee = 1.00; // Fixed $1 fee for all transactions
+    const network = 0.00; // No network fee
+    const total = Number((subtotal + fee).toFixed(2));
     return { subtotal, fee, network, total };
   }, [data.amount]);
 

@@ -62,15 +62,20 @@ export default function SuccessCallbackPage() {
   const [txSignature, setTxSignature] = useState<string | null>(null);
 
   const orderId = searchParams.get('orderId') || searchParams.get('id') || searchParams.get('order_id') || searchParams.get('ref');
-  const amount = parseFloat(searchParams.get('amount') || searchParams.get('total') || '0');
-  const token = (searchParams.get('token') as 'SOL' | 'USDC' | 'USDT' | null) || null;
+  const totalAmount = parseFloat(searchParams.get('amount') || searchParams.get('total') || '0');
+  const subtotalFromUrl = parseFloat(searchParams.get('subtotal') || '0');
+  // Use subtotal from URL if available, otherwise calculate it (total - $1 fixed fee)
+  const amount = subtotalFromUrl > 0 ? subtotalFromUrl : Math.max(0, totalAmount - 1.00);
+  const btcPriceUsd = 110956; // keep in sync with buy UI mock
+  const btcAmountComputed = amount > 0 ? amount / btcPriceUsd : 0;
+  const token = ('BTC' as any) as 'SOL' | 'USDC' | 'USDT' | null; // mock display as BTC
   const currencyParam = (searchParams.get('currency') as 'USD' | 'VND' | null) || (searchParams.get('currency_code') as 'USD' | 'VND' | null);
   const currency: 'USD' | 'VND' = currencyParam || 'USD';
   const status = searchParams.get('status');
 
   useEffect(() => {
     if (orderId && amount && token && currency) {
-      onrampFake(amount, currency, token, orderId);
+      onrampFake(amount, currency, token, orderId); // Use subtotal for token balance
     }
   }, [orderId, amount, token, currency, onrampFake]);
 
@@ -124,11 +129,7 @@ export default function SuccessCallbackPage() {
               console.error('Failed to update wallet store:', e);
             }
             
-            if (typeof credited === 'number' && credited > 0 && setTokenAmount) {
-              const urlToken = token || 'USDC';
-              console.log('💰 Setting token amount:', urlToken, credited);
-              setTokenAmount(urlToken, credited, 1);
-            }
+            // Do not mutate balances here; backend callback + refreshBalances will update USDC.
             
             try { 
               console.log('🔄 Refreshing balances...');
@@ -189,7 +190,12 @@ export default function SuccessCallbackPage() {
               )}
 
               <div className="flex justify-between items-center py-3 border-b border-[#1e1e2e]">
-                <span className="text-sm text-gray-400">Amount</span>
+                <span className="text-sm text-gray-400">Amount Paid</span>
+                <span className="text-base font-medium text-white">{formatCurrency(totalAmount || 0, currency)}</span>
+              </div>
+
+              <div className="flex justify-between items-center py-3 border-b border-[#1e1e2e]">
+                <span className="text-sm text-gray-400">Tokens Received</span>
                 <span className="text-base font-medium text-white">{formatCurrency(amount || 0, currency)}</span>
               </div>
 
@@ -197,8 +203,9 @@ export default function SuccessCallbackPage() {
                 <div className="flex justify-between items-center py-3 border-b border-[#1e1e2e]">
                   <span className="text-sm text-gray-400">Token</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-base font-medium text-white">{(amount || 0).toFixed(2)}</span>
-                    <span className="text-sm text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded">{token}</span>
+                    <img src="/bitcoin-btc-logo.png" alt="BTC" className="w-5 h-5 rounded-full" />
+                    <span className="text-base font-medium text-white">{btcAmountComputed.toFixed(8)}</span>
+                    <span className="text-sm text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded">BTC</span>
                   </div>
                 </div>
               )}
