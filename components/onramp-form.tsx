@@ -87,7 +87,7 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
   const tokenPrice = isMockBTC ? mockBtcPriceUsd : (tokenJupiterData?.usdPrice || 1);
   const estimatedReceive = amountUsd / tokenPrice;
 
-  const quickAmounts = [50000, 100000, 200000, 500000];
+  const quickAmounts = [50, 100, 200, 500];
 
   const ICON_OVERRIDES: Partial<Record<TokenSym, string>> = {
     // Use CoinGecko CDN (allows hotlinking) to avoid 403 from cryptologos
