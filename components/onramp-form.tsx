@@ -305,8 +305,8 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
                 </div>
                 <div className='text-2xl font-semibold text-muted-foreground/50'>
                   {estimatedReceive > 0
-                    ? formatDisplayValue(estimatedReceive.toFixed(2))
-                    : '0.00'}
+                    ? formatDisplayValue(estimatedReceive.toFixed(6))
+                    : '0.000000'}
                 </div>
                 <div className='text-xs text-muted-foreground mt-0.5'>
                   ≈ ${(estimatedReceive * tokenPrice).toFixed(2)}

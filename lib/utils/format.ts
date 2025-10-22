@@ -41,7 +41,15 @@ export const formatNumber = (num: number, decimals: number = 2): string => {
 };
 
 export const formatTokenAmount = (amount: number, symbol: TokenSym): string => {
-  const decimals = symbol === 'BONK' ? 0 : amount < 1 ? 4 : 2;
+  let decimals: number;
+  if (symbol === 'BONK') {
+    decimals = 0;
+  } else if ((symbol as any) === 'BTC') {
+    // BTC needs more decimal places due to high price
+    decimals = amount < 0.01 ? 8 : amount < 1 ? 6 : 4;
+  } else {
+    decimals = amount < 1 ? 4 : 2;
+  }
   return `${formatNumber(amount, decimals)} ${symbol}`;
 };
 
