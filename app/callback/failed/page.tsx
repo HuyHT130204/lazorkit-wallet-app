@@ -143,7 +143,7 @@ export default function FailedCallbackPage() {
           </Card>
 
           {/* Action Button */}
-          <Button className="w-full h-11 bg-white hover:bg-gray-100 text-black font-medium transition-colors" onClick={() => router.replace('/buy')}>
+          <Button className="w-full h-11 bg-white hover:bg-gray-100 text-black font-medium transition-colors" onClick={() => router.replace('/account')}>
             Return to App
           </Button>
         </div>

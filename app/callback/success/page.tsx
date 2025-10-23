@@ -238,7 +238,7 @@ export default function SuccessCallbackPage() {
 
           <Button 
             className="w-full h-11 bg-white hover:bg-gray-100 text-black font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
-            onClick={() => router.replace('/buy')}
+            onClick={() => router.replace('/account')}
             disabled={isLoadingWallet}
           >
             {isLoadingWallet ? (
