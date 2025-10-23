@@ -85,6 +85,28 @@ export const AssetsTab = () => {
 
   // Get token icon from Jupiter data or use fallback
   const getTokenIcon = (symbol: string) => {
+    // Special handling for BTC mock
+    if (symbol === 'BTC' || (symbol as any) === 'BTC') {
+      return (
+        <>
+          <img
+            src="/bitcoin-btc-logo.png"
+            alt="BTC"
+            className='w-10 h-10 rounded-lg object-cover'
+            onError={(e) => {
+              // Fallback to text icon if image fails to load
+              e.currentTarget.style.display = 'none';
+              const nextElement = e.currentTarget.nextSibling as HTMLElement;
+              nextElement?.classList.remove('hidden');
+            }}
+          />
+          <span className='hidden text-lg'>
+            ₿
+          </span>
+        </>
+      );
+    }
+    
     const jupiterToken = tokenData.get(symbol);
     if (jupiterToken?.icon) {
       return (
@@ -211,22 +233,7 @@ export const AssetsTab = () => {
                   <div className='flex items-center space-x-3'>
                     <div className='relative'>
                       <div className='w-10 h-10 rounded-lg overflow-hidden border border-border/50 shadow-sm flex items-center justify-center bg-muted/30'>
-                        {jupiterToken?.icon ? (
-                          <img
-                            src={jupiterToken.icon}
-                            alt={token.symbol}
-                            className='w-10 h-10 rounded-lg object-cover'
-                            onError={(e) => {
-                              // Fallback to text icon if image fails to load
-                              e.currentTarget.style.display = 'none';
-                              const nextElement = e.currentTarget.nextSibling as HTMLElement;
-                              nextElement?.classList.remove('hidden');
-                            }}
-                          />
-                        ) : null}
-                        <span className={`text-lg ${jupiterToken?.icon ? 'hidden' : ''}`}>
-                          {fallbackTokenIcons[token.symbol] || token.symbol.slice(0, 2)}
-                        </span>
+                        {getTokenIcon(token.symbol)}
                       </div>
                     </div>
                     <div>
@@ -234,7 +241,7 @@ export const AssetsTab = () => {
                         {token.symbol}
                       </div>
                       <div className='text-sm text-muted-foreground'>
-                        {jupiterToken?.name || `${token.symbol} Token`}
+                        {(token.symbol === 'BTC' || (token.symbol as any) === 'BTC') ? 'Bitcoin' : (jupiterToken?.name || `${token.symbol} Token`)}
                       </div>
                       <div className='text-xs text-muted-foreground'>
                         {showBalance
