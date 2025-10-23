@@ -86,7 +86,7 @@ export const AssetsTab = () => {
   // Get token icon from Jupiter data or use fallback
   const getTokenIcon = (symbol: string) => {
     // Special handling for BTC mock
-    if (symbol === 'BTC' || (symbol as any) === 'BTC') {
+    if ((symbol as any) === 'BTC') {
       return (
         <>
           <img
@@ -241,7 +241,7 @@ export const AssetsTab = () => {
                         {token.symbol}
                       </div>
                       <div className='text-sm text-muted-foreground'>
-                        {(token.symbol === 'BTC' || (token.symbol as any) === 'BTC') ? 'Bitcoin' : (jupiterToken?.name || `${token.symbol} Token`)}
+                        {((token.symbol as any) === 'BTC') ? 'Bitcoin' : (jupiterToken?.name || `${token.symbol} Token`)}
                       </div>
                       <div className='text-xs text-muted-foreground'>
                         {showBalance
