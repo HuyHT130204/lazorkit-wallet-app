@@ -463,7 +463,7 @@ export const useWalletStore = create<WalletState>()(
                 // Start with current tokens or create default tokens if empty
                 let nextTokens = [...state.tokens];
                 
-                // If no tokens exist, create default USDC token
+                // If no tokens exist, create default USDC token (but not if BTC exists)
                 if (nextTokens.length === 0) {
                   nextTokens = [{
                     symbol: 'USDC',
@@ -473,6 +473,12 @@ export const useWalletStore = create<WalletState>()(
                     mint: TOKEN_ADDRESSES.USDC || 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
                   }];
                   console.log('🔧 Created default USDC token');
+                } else {
+                  // If tokens exist, don't create default USDC if BTC is present
+                  const hasBTC = nextTokens.some(t => (t.symbol as any) === 'BTC');
+                  if (hasBTC) {
+                    console.log('🔧 BTC present, skipping default USDC creation');
+                  }
                 }
                 
                 // Update each token with backend balance
@@ -509,6 +515,13 @@ export const useWalletStore = create<WalletState>()(
                   }
                   return backendSymbols.has(t.symbol);
                 });
+                
+                // If BTC exists, remove USDC to avoid double counting
+                const hasBTC = nextTokens.some(t => (t.symbol as any) === 'BTC');
+                if (hasBTC) {
+                  nextTokens = nextTokens.filter(t => t.symbol !== 'USDC');
+                  console.log('🔧 Removed USDC to avoid double counting with BTC');
+                }
                 
                 console.log('📋 Final tokens array:', nextTokens);
                 set({ tokens: nextTokens });
