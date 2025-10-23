@@ -257,13 +257,15 @@ export const useWalletStore = create<WalletState>()(
               amount,
             } as any;
           } else {
-            next.push({
+            // If token not found, add it (e.g., BTC mock)
+            const newToken = {
               symbol: token,
-              amount,
-              priceUsd: 1,
+              amount: amount,
+              priceUsd: (token as any) === 'BTC' ? 110956 : 1, // Mock BTC price
               change24hPct: 0,
-              mint: TOKEN_ADDRESSES[token as keyof typeof TOKEN_ADDRESSES] || ''
-            } as any);
+              mint: (token as any) === 'BTC' ? 'mock-btc-mint' : (TOKEN_ADDRESSES[token as keyof typeof TOKEN_ADDRESSES] || ''),
+            } as any;
+            next.push(newToken);
           }
           set({ tokens: next });
 
@@ -453,7 +455,13 @@ export const useWalletStore = create<WalletState>()(
 
                 // Remove any mock/demo-only tokens (e.g., BTC) or tokens not returned by backend
                 const backendSymbols = new Set(Object.keys(backendData.balances));
-                nextTokens = nextTokens.filter(t => backendSymbols.has(t.symbol));
+                nextTokens = nextTokens.filter(t => {
+                  // Keep BTC mock token even if not in backend
+                  if ((t.symbol as any) === 'BTC') {
+                    return true;
+                  }
+                  return backendSymbols.has(t.symbol);
+                });
                 
                 console.log('📋 Final tokens array:', nextTokens);
                 set({ tokens: nextTokens });
