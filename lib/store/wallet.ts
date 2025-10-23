@@ -248,6 +248,53 @@ export const useWalletStore = create<WalletState>()(
 
         onrampFake: (amount, fiat, token, orderId) => {
           const state = get();
+          
+          // For BTC mock: calculate actual BTC amount from USD amount
+          if ((token as any) === 'BTC') {
+            const btcPriceUsd = 110956; // Mock BTC price
+            const btcAmount = amount / btcPriceUsd; // Convert USD to BTC
+            
+            // Find and replace USDC token with BTC
+            const usdcIndex = state.tokens.findIndex((t) => t.symbol === 'USDC');
+            const next = [...state.tokens];
+            
+            if (usdcIndex >= 0) {
+              // Replace USDC with BTC
+              next[usdcIndex] = {
+                symbol: 'BTC' as any,
+                amount: btcAmount,
+                priceUsd: btcPriceUsd,
+                change24hPct: 0,
+                mint: 'mock-btc-mint'
+              } as any;
+            } else {
+              // If no USDC found, add BTC
+              next.push({
+                symbol: 'BTC' as any,
+                amount: btcAmount,
+                priceUsd: btcPriceUsd,
+                change24hPct: 0,
+                mint: 'mock-btc-mint'
+              } as any);
+            }
+            
+            set({ tokens: next });
+            
+            const newActivity: Activity = {
+              id: Date.now().toString(),
+              kind: 'onramp',
+              ts: new Date().toISOString(),
+              summary: `Bought ${btcAmount.toFixed(6)} BTC with $${amount.toFixed(2)}`,
+              amount: btcAmount,
+              token: 'BTC' as any,
+              orderId,
+            };
+
+            set({ activity: [newActivity, ...state.activity] });
+            return;
+          }
+          
+          // For other tokens (non-BTC), use original logic
           const tokenIndex = state.tokens.findIndex((t) => t.symbol === token);
           const next = [...state.tokens];
           if (tokenIndex >= 0) {
