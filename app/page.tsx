@@ -1,17 +1,15 @@
 "use client";
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useWalletStore } from '@/lib/store/wallet';
 
 export default function Home() {
   const router = useRouter();
-  const hasWallet = useWalletStore((s) => s.hasWallet);
 
   useEffect(() => {
-    if (!hasWallet) router.replace('/buy');
-    else router.replace('/account');
-  }, [hasWallet, router]);
+    // Homepage is /buy for all users (including new users)
+    // New users will see wallet banner with no address and balance = 0
+    router.replace('/buy');
+  }, [router]);
 
-  if (!hasWallet) return null;
   return null;
 }

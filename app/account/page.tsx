@@ -201,11 +201,11 @@ export default function AccountPage() {
                 </TabsContent>
                 <TabsContent value='devices' className='mt-4'>
                   <ErrorBoundary>
-                    {activeTab === 'devices' && canShowDevices && pubkey ? (
+                    {activeTab === 'devices' && canShowDevices ? (
                       <DevicesTab />
                     ) : (
                       <div className="text-center py-8">
-                        <p className="text-gray-400 text-sm">{pubkey ? 'Loading devices…' : 'Connect your wallet to manage devices'}</p>
+                        <p className="text-gray-400 text-sm">Loading devices…</p>
                       </div>
                     )}
                   </ErrorBoundary>

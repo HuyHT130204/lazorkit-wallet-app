@@ -3,7 +3,6 @@
 import { Menu, ArrowLeft } from 'lucide-react';
 import { Button } from './ui/button';
 import { t } from '@/lib/i18n';
-import { useWalletStore } from '@/lib/store/wallet';
 import { useRouter } from 'next/navigation';
 
 interface AppHeaderProps {
@@ -21,9 +20,8 @@ export const AppHeader = ({
   showBack = false,
   onBackClick,
 }: AppHeaderProps) => {
-  const { hasWallet } = useWalletStore();
   const router = useRouter();
-  const shouldShowMenu = showMenu && hasWallet;
+  const shouldShowMenu = showMenu;
   
   const handleBackClick = () => {
     if (onBackClick) {
