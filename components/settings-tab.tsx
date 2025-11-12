@@ -19,14 +19,20 @@ import { Label } from './ui/label';
 import { SimpleSelect } from './ui/simple-select';
 import { Switch } from '@/components/ui/switch';
 import { useWalletStore } from '@/lib/store/wallet';
+import { useWallet } from '@/hooks/use-lazorkit-wallet';
 import { t } from '@/lib/i18n';
 import { useLanguage } from '@/hooks/use-language';
 import { toast } from '@/hooks/use-toast';
 import { ENV_CONFIG } from '@/lib/config/env';
+import { useRouter } from 'next/navigation';
+import { Loader2, RefreshCw } from 'lucide-react';
 // WalletManager removed per requirement
 
 export const SettingsTab = () => {
-  const { fiat, setFiat, resetDemoData, setHasPasskey, logout, walletName, setWalletName } = useWalletStore();
+  const { fiat, setFiat, resetDemoData, setHasPasskey, logout, walletName, setWalletName, hasWallet, setHasWallet, setPubkey } = useWalletStore();
+  const wallet = useWallet();
+  const router = useRouter();
+  const [isReconnecting, setIsReconnecting] = useState(false);
 
   const { language, setLanguage } = useLanguage();
   const [passkeyEnabled, setPasskeyEnabled] = useState(true);
@@ -71,6 +77,69 @@ export const SettingsTab = () => {
     });
   };
 
+  // Reconnect wallet for existing user who cleared cache
+  const handleReconnectWallet = async () => {
+    if (isReconnecting) return;
+    setIsReconnecting(true);
+
+    try {
+      if (!wallet?.connectPasskey) {
+        throw new Error('Passkey login not available');
+      }
+
+      const passkeyData = await wallet.connectPasskey();
+      if (!passkeyData) throw new Error('Failed to login with passkey');
+
+      setHasPasskey?.(true);
+
+      // Get wallet address from passkey data
+      const walletAddress = passkeyData?.smartWalletAddress;
+      
+      if (!walletAddress) {
+        throw new Error('No wallet address found in passkey data');
+      }
+
+      // Verify wallet address exists on chain
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+      const resp = await fetch(`${apiBase}/api/device-import/verify-passkey`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          passkeyData,
+          walletAddress
+        }),
+      });
+
+      if (!resp.ok) {
+        throw new Error('Failed to verify wallet address');
+      }
+
+      const data = await resp.json();
+      
+      if (data.verified === true) {
+        // Reconnect successful
+        setHasWallet?.(true);
+        setPubkey?.(walletAddress);
+        toast({
+          title: 'Wallet reconnected',
+          description: 'Your wallet has been successfully reconnected.',
+        });
+        router.push('/buy');
+      } else {
+        throw new Error('Wallet address verification failed');
+      }
+    } catch (e: any) {
+      console.error('Reconnect wallet failed:', e);
+      toast({
+        title: 'Reconnect failed',
+        description: e?.message || 'Please try again',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsReconnecting(false);
+    }
+  };
+
   return (
     <div className='space-y-6 pb-6'>
       {/* Wallet Manager removed */}
@@ -83,7 +152,34 @@ export const SettingsTab = () => {
         </div>
         
         <Card className='border border-border/50 bg-card/50 backdrop-blur-sm shadow-sm'>
-          <CardContent className='p-4'>
+          <CardContent className='p-4 space-y-4'>
+            {/* Reconnect Wallet Button - Show when wallet not connected */}
+            {!hasWallet && (
+              <div className='space-y-2'>
+                <div className='flex items-center gap-2 text-sm text-muted-foreground'>
+                  <Info className='h-4 w-4' />
+                  <span>Lost access to your wallet?</span>
+                </div>
+                <Button
+                  onClick={handleReconnectWallet}
+                  disabled={isReconnecting}
+                  className='w-full h-10 bg-[#16ffbb] hover:bg-[#16ffbb]/90 text-black shadow-lg hover:shadow-[#16ffbb]/25 transition-all duration-200'
+                >
+                  {isReconnecting ? (
+                    <>
+                      <Loader2 className='h-4 w-4 mr-2 animate-spin' />
+                      Reconnecting...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className='h-4 w-4 mr-2' />
+                      Reconnect Wallet
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+
             <div className='space-y-2.5'>
               <Label htmlFor='walletName' className='text-xs font-medium text-muted-foreground uppercase tracking-wider'>
                 {t('settings.walletName')}
@@ -100,7 +196,7 @@ export const SettingsTab = () => {
                   <button
                     type='button'
                     onClick={() => setWalletName(pendingName.trim())}
-                    className='h-8 w-8 inline-flex items-center justify-center rounded-md border border-border/50 hover:bg-muted/20'
+                    className='h-8 w-8 inline-flex items-center justify-center rounded-md border border-border/50 hover:bg-muted/20 transition-colors'
                     aria-label='Save wallet name'
                   >
                     <Check className='h-4 w-4' />
@@ -108,7 +204,7 @@ export const SettingsTab = () => {
                   <button
                     type='button'
                     onClick={() => { setPendingName(''); setWalletName(''); }}
-                    className='h-8 w-8 inline-flex items-center justify-center rounded-md border border-border/50 hover:bg-muted/20'
+                    className='h-8 w-8 inline-flex items-center justify-center rounded-md border border-border/50 hover:bg-muted/20 transition-colors'
                     aria-label='Clear wallet name'
                   >
                     <XIcon className='h-4 w-4' />

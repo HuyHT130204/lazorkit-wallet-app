@@ -11,7 +11,7 @@ if (typeof window !== 'undefined' && (QrScannerLib as any).WORKER_PATH == null) 
 }
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { X, Camera, AlertCircle, Upload, Download, Image as ImageIcon } from 'lucide-react';
+import { X, Camera, AlertCircle, Upload, Image as ImageIcon } from 'lucide-react';
 import QRCode from 'qrcode';
 
 interface QRScannerModalProps {
@@ -146,27 +146,6 @@ export const QRScannerModal = ({ open, onOpenChange, onQRScanned }: QRScannerMod
     }
   };
 
-  const saveQRImage = async (qrData: string) => {
-    try {
-      const canvas = document.createElement('canvas');
-      await QRCode.toCanvas(canvas, qrData, {
-        width: 256,
-        margin: 2,
-        color: {
-          dark: '#16ffbb',
-          light: '#000000'
-        }
-      });
-      
-      const link = document.createElement('a');
-      link.download = 'qr-code.png';
-      link.href = canvas.toDataURL();
-      link.click();
-    } catch (error) {
-      console.error('Failed to save QR code:', error);
-      setError('Failed to save QR code');
-    }
-  };
 
   if (!open) return null;
 
@@ -292,24 +271,6 @@ export const QRScannerModal = ({ open, onOpenChange, onQRScanned }: QRScannerMod
             </div>
           )}
 
-          {/* Save QR Button */}
-          <div className="pt-4 border-t border-gray-700">
-            <Button
-              onClick={() => {
-                const sampleQRData = JSON.stringify({
-                  type: 'device_import',
-                  shareId: 'sample_' + Date.now(),
-                  timestamp: new Date().toISOString()
-                });
-                saveQRImage(sampleQRData);
-              }}
-              variant="outline"
-              className="w-full border-[#16ffbb]/50 text-[#16ffbb] hover:bg-[#16ffbb]/10"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Save Sample QR Code
-            </Button>
-          </div>
         </CardContent>
       </Card>
     </div>

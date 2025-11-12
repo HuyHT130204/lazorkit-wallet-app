@@ -69,8 +69,8 @@ export default function AccountPage() {
                     {/* Header */}
                     <div className="flex justify-between items-start mb-4">
                       <div className="flex items-center gap-2">
-                        <div className="w-10 h-10 rounded-lg overflow-hidden border border-[color:#16ffbb]/30 shadow-sm">
-                          <Blockie seed={pubkey || 'demo'} size={8} scale={4} />
+                        <div className="w-10 h-10 rounded-lg overflow-hidden border border-[color:#16ffbb]/30 shadow-sm flex items-center justify-center">
+                          <Blockie seed={pubkey || 'demo'} size={8} scale={4} className="w-full h-full" />
                         </div>
                         <div className="flex flex-col leading-tight">
                           <span className="text-[color:#16ffbb] font-bold text-[10px] tracking-wide">SOLANA</span>
@@ -201,11 +201,11 @@ export default function AccountPage() {
                 </TabsContent>
                 <TabsContent value='devices' className='mt-4'>
                   <ErrorBoundary>
-                    {activeTab === 'devices' && canShowDevices && pubkey ? (
+                    {activeTab === 'devices' && canShowDevices ? (
                       <DevicesTab />
                     ) : (
                       <div className="text-center py-8">
-                        <p className="text-gray-400 text-sm">{pubkey ? 'Loading devices…' : 'Connect your wallet to manage devices'}</p>
+                        <p className="text-gray-400 text-sm">Loading devices…</p>
                       </div>
                     )}
                   </ErrorBoundary>

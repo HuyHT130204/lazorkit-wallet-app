@@ -35,7 +35,7 @@ export function Blockie({ seed, size = 8, scale = 6, className }: BlockieProps) 
     };
 
     // Colors
-    const primary = '#7857ff';
+    const primary = '#00b36c';
     const bg = '#14151B';
 
     // Mirror pattern horizontally for identicon look

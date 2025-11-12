@@ -3,7 +3,6 @@
 import { Menu, ArrowLeft } from 'lucide-react';
 import { Button } from './ui/button';
 import { t } from '@/lib/i18n';
-import { useWalletStore } from '@/lib/store/wallet';
 import { useRouter } from 'next/navigation';
 
 interface AppHeaderProps {
@@ -21,9 +20,8 @@ export const AppHeader = ({
   showBack = false,
   onBackClick,
 }: AppHeaderProps) => {
-  const { hasWallet } = useWalletStore();
   const router = useRouter();
-  const shouldShowMenu = showMenu && hasWallet;
+  const shouldShowMenu = showMenu;
   
   const handleBackClick = () => {
     if (onBackClick) {
@@ -62,15 +60,13 @@ export const AppHeader = ({
 
         <div className='flex flex-1 items-center justify-end space-x-2'>
           {shouldShowMenu && (
-            <Button
-              variant='ghost'
-              size='lg'
+            <button
               onClick={onMenuClick}
-              className='h-14 w-14 p-0 hover:bg-primary/10 transition-all duration-200 rounded-xl'
+              className='menu-burger-button'
+              aria-label='Open menu'
             >
-              <Menu className='size-6' />
-              <span className='sr-only'>Open menu</span>
-            </Button>
+              <Menu className='menu-burger-icon' />
+            </button>
           )}
         </div>
       </div>
